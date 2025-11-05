@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, startTransition } from 'react';
 import { Header } from './components/Header';
 import { AuthModal } from './components/AuthModal';
-import { HostApplicationModal } from './components/HostApplicationModal'; // ★ (1. 호스트 모달 임포트)
+import { HostApplicationModal } from './components/HostApplicationModal';
 import { SpaceCard } from './components/SpaceCard';
 import { QuickFilter } from './components/QuickFilter';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -31,8 +31,8 @@ export default function App() {
   }, [user]);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showHostApplicationModal, setShowHostApplicationModal] = useState(false); // ★ (2. 호스트 모달 상태 추가)
-  const [isHostLoading, setIsHostLoading] = useState(false); // ★ (호스트 신청 로딩 상태)
+  const [showHostApplicationModal, setShowHostApplicationModal] = useState(false);
+  const [isHostLoading, setIsHostLoading] = useState(false);
 
   const [showSpaceRegistration, setShowSpaceRegistration] = useState(false);
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
@@ -82,7 +82,7 @@ export default function App() {
       setUser(userData);
     } catch (error) {
       console.log("Not logged in (this is normal)");
-      setUser(null); // (추가) 에러 시 확실하게 null로 설정
+      setUser(null);
     }
   }, []);
 
@@ -128,25 +128,23 @@ export default function App() {
   useEffect(() => { localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces)); }, [favoriteSpaces]);
   useEffect(() => { localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed)); }, [recentlyViewed]);
 
-  // ★ (3. "호스트 되기" 버튼 클릭 시)
+  // ("호스트 되기" 버튼 클릭 시)
   const handleToggleHostMode = useCallback(() => {
     if (isHost) {
       toast.info("이미 호스트 권한을 가지고 있습니다.");
       return;
     }
-    // (수정) "개발 중" 대신 모달 띄우기
     setShowHostApplicationModal(true);
   }, [isHost]);
 
-  // ★ (4. "호스트 신청" 모달 Submit 시)
+  // ("호스트 신청" 모달 Submit 시)
   const handleHostApplicationSubmit = useCallback(async (data: { businessLicenseNumber: string; description: string }) => {
     setIsHostLoading(true);
     try {
-      await authService.upgradeToHost(data); // (API 호출)
+      await authService.upgradeToHost(data);
       toast.success("호스트 신청이 완료되었습니다! 다시 로그인하여 권한을 갱신하세요.");
       setShowHostApplicationModal(false);
-      // (선택) 즉시 로그아웃 시키거나, /api/me를 다시 호출하여 user 상태 갱신
-      await checkLoginStatus(); // (user 상태 갱신 시도)
+      await checkLoginStatus();
     } catch (error: any) {
       console.error("Host application failed:", error);
       toast.error(error.response?.data?.message || "호스트 신청 중 오류가 발생했습니다.");
@@ -183,7 +181,7 @@ export default function App() {
     <div className="min-h-screen bg-background">
       <Header
         user={user}
-        onLogin={handleShowLoginModal} // (모달 띄우기)
+        onLogin={handleShowLoginModal}
         onLogout={handleLogout}
         onToggleHostMode={handleToggleHostMode}
         isHost={isHost}
@@ -232,20 +230,31 @@ export default function App() {
               </div>
             )}
 
-            {/* (Search Results Alert) */}
+            {/* ★★★ (수정) Search Results Alert: 아이콘 추가 ★★★ */}
             {isSearched && !showAllMode && !isHost && (
-              <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20" id="search-results-section">
+              // (수정) Tailwind 클래스 및 아이콘 추가
+              <div className="mb-6 p-4 rounded-lg bg-gray-100 border" id="search-results-section"> {/* (수정) bg-primary/10 -> bg-gray-100 */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold text-primary">검색 결과</h3>
-                    <p className="text-sm text-muted-foreground">
-                      조건에 맞는 <span className="font-semibold text-primary">{pagination.totalElements}개</span>의 공간을 찾았습니다
-                    </p>
+
+                  {/* 아이콘과 텍스트를 flex로 묶음 */}
+                  <div className="flex items-center gap-4"> {/* (수정) gap-3 -> gap-4 */}
+                    {/* 아이콘 (이미지 참고) */}
+                    <div className="flex-shrink-0 p-3 rounded-full bg-white border shadow-sm"> {/* (수정) 스타일 변경 */}
+                      <Grid className="w-5 h-5 text-gray-700" /> {/* (수정) 색상 변경 */}
+                    </div>
+                    {/* 텍스트 div */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">검색 결과</h3> {/* (수정) 스타일 변경 */}
+                      <p className="text-sm text-muted-foreground">
+                        조건에 맞는 <span className="font-semibold text-primary">{pagination.totalElements}개</span>의 공간을 찾았습니다
+                      </p>
+                    </div>
                   </div>
+
                   <Button
                     variant="outline"
                     onClick={handleShowAllSpaces}
-                    className="border-primary/20 text-primary hover:bg-primary/10"
+                    className="bg-white" // (수정) 버튼 스타일
                   >
                     전체 보기 ({pagination.totalElements}개)
                   </Button>
@@ -253,7 +262,7 @@ export default function App() {
               </div>
             )}
 
-            {/* ★ (5. 수정) Spaces Section: "기존 코드" 주석을 실제 코드로 복원 */}
+            {/* (Spaces Section) */}
             <div className="p-6 rounded-xl border bg-card/50" id="spaces-section">
                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div>
@@ -351,7 +360,7 @@ export default function App() {
         onLogin={handleOidcLogin}
       />
 
-      {/* ★ (6. 추가) 호스트 신청 모달 렌더링 */}
+      {/* (호스트 신청 모달 렌더링) */}
       <HostApplicationModal
         isOpen={showHostApplicationModal}
         onClose={() => setShowHostApplicationModal(false)}
