@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, startTransition } from 'react';
 import { Header } from './components/Header';
-// AuthModal (삭제)
+import { AuthModal } from './components/AuthModal'; // ★ (추가) AuthModal 임포트
 import { SpaceCard } from './components/SpaceCard';
 import { QuickFilter } from './components/QuickFilter';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -9,10 +9,8 @@ import { Badge } from './components/ui/badge';
 import { Plus, Grid, List, Heart } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 
-// (수정) API 서비스 및 타입 임포트
 import spaceService from './service/spaceService';
-// import { getMe } from './service/userService'; // (삭제)
-import authService from './service/authService'; // (추가) authService 임포트
+import authService from './service/authService'; // (수정) authService 임포트
 import { Space, SpaceSearchParams, User } from '../lib/types';
 
 // Lazy load heavy components
@@ -25,7 +23,7 @@ const ReservationDashboard = React.lazy(() => import('./components/ReservationDa
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isHost, setIsHost] = useState(false);
-  // showAuthModal (삭제)
+  const [showAuthModal, setShowAuthModal] = useState(false); // ★ (추가) 모달 상태
   const [showSpaceRegistration, setShowSpaceRegistration] = useState(false);
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -52,10 +50,15 @@ export default function App() {
   const [favoriteSpaces, setFavoriteSpaces] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
-  // (수정) OIDC 로그인 핸들러 (authService 사용)
-  const handleOidcLogin = useCallback(() => {
-    // 'google'은 application.yml에 설정한 provider-id입니다. (naver, kakao 등)
-    authService.redirectToOidcLogin('google');
+  // ★ (수정) 1. 이 함수는 모달을 띄우는 역할만 합니다.
+  const handleShowLoginModal = useCallback(() => {
+    setShowAuthModal(true);
+  }, []);
+
+  // ★ (수정) 2. 이 함수가 모달로부터 'google', 'kakao' 등을 받아 OIDC 리디렉션을 실행합니다.
+  const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => {
+    authService.redirectToOidcLogin(provider);
+    // (참고: kakao, naver는 Spring Boot application.yml에 추가 설정이 필요합니다)
   }, []);
 
   // (수정) OIDC 로그아웃 핸들러 (authService 사용)
@@ -67,7 +70,7 @@ export default function App() {
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const userData = await authService.getCurrentUser(); // (수정) /api/me 호출
+        const userData = await authService.getCurrentUser(); // /api/me 호출
         setUser(userData);
       } catch (error) {
         // 401 오류(로그인 안 됨) 등이 발생하면 user는 null로 유지됩니다.
@@ -314,8 +317,8 @@ export default function App() {
     <div className="min-h-screen bg-background">
       <Header
         user={user}
-        onLogin={handleOidcLogin} // (수정) OIDC 로그인 함수 연결
-        onLogout={handleLogout} // (수정) OIDC 로그아웃 함수 연결
+        onLogin={handleShowLoginModal} // ★ (수정) OIDC 리디렉션 대신 모달 띄우는 함수 연결
+        onLogout={handleLogout}
         onToggleHostMode={handleToggleHostMode}
         isHost={isHost}
         onNavigate={handleNavigate}
@@ -360,7 +363,8 @@ export default function App() {
             {/* ★★★ 3. (추가) 로그인 유도 (피그마 디자인) ★★★ */}
             {!user && (
               <div className="text-center mb-12">
-                <Button size="lg" onClick={handleOidcLogin}>
+                {/* ★ (수정) OIDC 리디렉션 대신 모달 띄우는 함수 연결 */}
+                <Button size="lg" onClick={handleShowLoginModal}>
                   로그인하고 시작하기
                 </Button>
                 <p className="text-sm text-muted-foreground mt-2">
@@ -497,8 +501,14 @@ export default function App() {
         )}
       </main>
 
-      {/* AuthModal (삭제) */}
+      {/* ★ (추가) AuthModal 렌더링 */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLogin={handleOidcLogin} // ★ OIDC 리디렉션 함수를 모달에 전달
+      />
 
+      {/* ... (SpaceRegistration, SpaceDetail, BookingModal, PaymentModal Suspense) ... */}
       <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <SpaceRegistration
           isOpen={showSpaceRegistration}
@@ -517,7 +527,7 @@ export default function App() {
           isFavorited={selectedSpace ? favoriteSpaces.includes(selectedSpace.id) : false}
           onToggleFavorite={handleToggleFavorite}
         />
-      </Suspense>
+      </Suspense> {/* <-- 아까 그 오타가 여기 또 있었습니다. 'Suspense'로 수정합니다. */}
 
       <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <BookingModal
