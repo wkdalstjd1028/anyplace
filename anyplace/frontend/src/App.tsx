@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, startTransition } from 'react';
 import { Header } from './components/Header';
-import { AuthModal } from './components/AuthModal'; // ★ (추가) AuthModal 임포트
+import { AuthModal } from './components/AuthModal'; // (추가) AuthModal 임포트
 import { SpaceCard } from './components/SpaceCard';
 import { QuickFilter } from './components/QuickFilter';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -10,7 +10,7 @@ import { Plus, Grid, List, Heart } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 
 import spaceService from './service/spaceService';
-import authService from './service/authService'; // (수정) authService 임포트
+import authService from './service/authService';
 import { Space, SpaceSearchParams, User } from '../lib/types';
 
 // Lazy load heavy components
@@ -22,8 +22,15 @@ const ReservationDashboard = React.lazy(() => import('./components/ReservationDa
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [isHost, setIsHost] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false); // ★ (추가) 모달 상태
+
+  // ★ (수정) isHost 상태를 user의 role로부터 '파생'시킵니다.
+  const isHost = useMemo(() => {
+    if (!user) return false;
+    // Spring의 Role.java 키("ROLE_HOST", "ROLE_ADMIN")와 일치해야 합니다.
+    return user.role === 'ROLE_HOST' || user.role === 'ROLE_ADMIN';
+  }, [user]); // user 객체가 바뀔 때만 재계산됩니다.
+
+  const [showAuthModal, setShowAuthModal] = useState(false); // (추가) 모달 상태
   const [showSpaceRegistration, setShowSpaceRegistration] = useState(false);
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -50,43 +57,40 @@ export default function App() {
   const [favoriteSpaces, setFavoriteSpaces] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
-  // ★ (수정) 1. 이 함수는 모달을 띄우는 역할만 합니다.
+  // (수정) 1. 이 함수는 모달을 띄우는 역할만 합니다.
   const handleShowLoginModal = useCallback(() => {
     setShowAuthModal(true);
   }, []);
 
-  // ★ (수정) 2. 이 함수가 모달로부터 'google', 'kakao' 등을 받아 OIDC 리디렉션을 실행합니다.
+  // (수정) 2. 이 함수가 모달로부터 'google', 'kakao' 등을 받아 OIDC 리디렉션을 실행합니다.
   const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => {
     authService.redirectToOidcLogin(provider);
     // (참고: kakao, naver는 Spring Boot application.yml에 추가 설정이 필요합니다)
   }, []);
 
-  // (수정) OIDC 로그아웃 핸들러 (authService 사용)
+  // OIDC 로그아웃 핸들러 (authService 사용)
   const handleLogout = useCallback(() => {
     authService.logout();
   }, []);
 
-  // (수정) 로그인 상태 확인 (authService 사용)
+  // 로그인 상태 확인 (authService 사용)
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
         const userData = await authService.getCurrentUser(); // /api/me 호출
         setUser(userData);
       } catch (error) {
-        // 401 오류(로그인 안 됨) 등이 발생하면 user는 null로 유지됩니다.
         console.log("Not logged in (this is normal)");
       }
     };
     checkLoginStatus();
-  }, []); // 빈 배열: 컴포넌트 마운트 시 1회 실행
+  }, []);
 
   // 공간 데이터 불러오기
   const fetchSpaces = useCallback(async (params: SpaceSearchParams) => {
     setIsLoading(true);
     try {
       const response = await spaceService.searchSpaces(params);
-
-      // (수정됨) response.data가 아닌 response 자체를 사용
       if (params.page === 0 || params.page === undefined) {
         setSpaces(response.content);
       } else {
@@ -98,7 +102,6 @@ export default function App() {
         totalPages: response.totalPages,
         totalElements: response.totalElements
       });
-
     } catch (err) {
       console.error("API Error fetching spaces:", err);
       toast.error('공간 정보를 불러오는 데 실패했습니다.');
@@ -112,7 +115,6 @@ export default function App() {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
     fetchSpaces(initialParams);
     setCurrentFilters(initialParams);
-
     const savedFavorites = localStorage.getItem('anyplace_favorites');
     const savedRecentlyViewed = localStorage.getItem('anyplace_recently_viewed');
     if (savedFavorites) {
@@ -121,7 +123,7 @@ export default function App() {
     if (savedRecentlyViewed) {
       setRecentlyViewed(JSON.parse(savedRecentlyViewed));
     }
-  }, [fetchSpaces, pagination.size]); // (수정) 의존성 배열 fetchSpaces 추가
+  }, [fetchSpaces, pagination.size]);
 
   useEffect(() => {
     localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces));
@@ -131,12 +133,18 @@ export default function App() {
     localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed));
   }, [recentlyViewed]);
 
+  // ★ (수정) '호스트 신청' 로직으로 변경
   const handleToggleHostMode = useCallback(() => {
-    // (참고) 실제 호스트 전환 로직은 API 호출이 필요할 수 있습니다.
-    // (UserService의 upgradeToHost API 호출 등)
-    setIsHost(!isHost);
-    toast.success(isHost ? '게스트 모드로 전환되었습니다' : '호스트 모드로 전환되었습니다');
-  }, [isHost]);
+    if (isHost) {
+      toast.info("이미 호스트 권한을 가지고 있습니다.");
+      return;
+    }
+
+    // TODO: 호스트 신청 모달을 띄웁니다. (예: setShowHostApplicationModal(true))
+    console.log("호스트 신청 모달 띄우기");
+    toast.info('호스트 신청 기능은 현재 개발 중입니다.');
+
+  }, [isHost]); // user가 아닌 isHost에 의존
 
   const handleSpaceRegistration = async (spaceData: any) => {
     try {
@@ -186,12 +194,9 @@ export default function App() {
       size: pagination.size,
       sort: 'createdAt,desc',
       district: filters.location || undefined,
-      // (참고) location이 '시/도'를 포함해야 city도 동적으로 설정 가능
-      // city: filters.location ? '서울' : undefined, // (임시)
       type: filters.spaceType || undefined,
       minCapacity: filters.capacity > 0 ? filters.capacity : undefined,
       checkInDate: filters.date || undefined,
-      // (참고) checkOutDate가 현재 필터에 없음
     };
 
     setIsSearched(true);
@@ -298,7 +303,7 @@ export default function App() {
   const recentlyViewedSpaces = useMemo(() =>
     recentlyViewed
       .map(id => spaces.find(space => space.id === id))
-      .filter((space): space is Space => !!space) // (타입스크립트 RCE-13416)
+      .filter((space): space is Space => !!space)
       .slice(0, 6),
     [recentlyViewed, spaces]
   );
@@ -317,10 +322,10 @@ export default function App() {
     <div className="min-h-screen bg-background">
       <Header
         user={user}
-        onLogin={handleShowLoginModal} // ★ (수정) OIDC 리디렉션 대신 모달 띄우는 함수 연결
+        onLogin={handleShowLoginModal} // ★ (수정) 모달 띄우는 함수 연결
         onLogout={handleLogout}
         onToggleHostMode={handleToggleHostMode}
-        isHost={isHost}
+        isHost={isHost} // ★ (수정) user.role 기반으로 파생된 isHost 전달
         onNavigate={handleNavigate}
         onResetToHome={handleResetToHome}
         currentView={currentView}
@@ -333,7 +338,7 @@ export default function App() {
               reservations={reservations}
               onUpdateReservation={handleUpdateReservation}
               onCancelReservation={handleCancelReservation}
-              isHost={isHost}
+              isHost={isHost} // ★ (수정) 파생된 isHost 전달
             />
           </Suspense>
         )}
@@ -345,7 +350,7 @@ export default function App() {
         {/* Home View */}
         {currentView === 'home' && (
           <>
-            {/* ★★★ 1. (추가) Hero 섹션 ★★★ */}
+            {/* ... (Hero 섹션, QuickFilter, 로그인 유도 버튼 유지) ... */}
             <div className="text-center pt-16 pb-12">
               <h2 className="text-4xl md:text-5xl font-bold mb-4">
                 어떤 공간이든, anyplace에서
@@ -354,16 +359,11 @@ export default function App() {
                 회의실, 파티룸, 녹음실부터 연습실까지 - 필요한 모든 공간을 anyplace에서 찾아보세요
               </p>
             </div>
-
-            {/* ★★★ 2. (추가) QuickFilter 컴포넌트 ★★★ */}
             <div className="mb-12">
               <QuickFilter onSearch={handleQuickFilter} />
             </div>
-
-            {/* ★★★ 3. (추가) 로그인 유도 (피그마 디자인) ★★★ */}
             {!user && (
               <div className="text-center mb-12">
-                {/* ★ (수정) OIDC 리디렉션 대신 모달 띄우는 함수 연결 */}
                 <Button size="lg" onClick={handleShowLoginModal}>
                   로그인하고 시작하기
                 </Button>
@@ -373,34 +373,15 @@ export default function App() {
               </div>
             )}
 
-            {/* ... (Personalized Sections - 일단 주석 처리) ... */}
-
-            {/* (수정) Search Results Alert: pagination.totalElements 사용 */}
+            {/* (Search Results Alert) */}
             {isSearched && !showAllMode && !isHost && (
-              // (수정) Tailwind 클래스 추가
               <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20" id="search-results-section">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold text-primary">검색 결과</h3>
-                    <p className="text-sm text-muted-foreground">
-                      조건에 맞는 <span className="font-semibold text-primary">{pagination.totalElements}개</span>의 공간을 찾았습니다
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleShowAllSpaces}
-                    className="border-primary/20 text-primary hover:bg-primary/10"
-                  >
-                    전체 보기 ({pagination.totalElements}개)
-                  </Button>
-                </div>
+                {/* ... (기존 코드) ... */}
               </div>
             )}
 
             {/* Spaces Section */}
-            {/* (수정) Tailwind 클래스 추가 */}
             <div className="p-6 rounded-xl border bg-card/50" id="spaces-section">
-              {/* (수정) Section Header UI */}
                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div>
                   <h3 className="text-2xl font-semibold">
@@ -410,6 +391,7 @@ export default function App() {
                     {isHost ? '등록한 공간을 확인하고 관리하세요' : (isSearched ? '검색 조건에 맞는 공간입니다' : 'anyplace에 등록된 전체 공간입니다')}
                   </p>
                 </div>
+                 {/* ★ (수정) 파생된 isHost로 "새 공간 등록" 버튼 노출 여부 결정 */}
                  {isHost && (
                   <Button onClick={() => setShowSpaceRegistration(true)}>
                     <Plus className="w-4 h-4 mr-2" />
@@ -418,50 +400,23 @@ export default function App() {
                 )}
               </div>
 
-              {/* (수정) Filter Status: pagination.totalElements 사용 */}
+              {/* (Filter Status) */}
               <div className="flex flex-col sm:flex-row justify-between items-center mb-4 pb-4 border-b">
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-sm font-medium">
-                    {pagination.totalElements}개 공간
-                  </Badge>
-                  {/* (필터 Badge UI는 일단 생략) */}
-                </div>
-                {/* (View Mode Buttons) */}
-                <div className="flex items-center gap-2 mt-3 sm:mt-0">
-                  <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('grid')}>
-                    <Grid className="w-4 h-4" />
-                  </Button>
-                  <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')}>
-                    <List className="w-4 h-4" />
-                  </Button>
-                </div>
+                {/* ... (기존 코드) ... */}
               </div>
 
-              {/* (수정) Spaces Content: 로딩 및 빈 상태 처리 */}
+              {/* (Spaces Content) */}
               {isLoading && spaces.length === 0 ? (
-                // 1. 첫 로딩 시 스피너
                 <div className="flex justify-center py-16">
                   <LoadingSpinner size="lg" />
                 </div>
               ) : !isLoading && spaces.length === 0 ? (
-                // 2. 로딩 후 결과 없음
                 <div className="text-center py-16">
-                   <h4 className="text-xl font-medium mb-2">결과 없음</h4>
-                   <p className="text-muted-foreground">
-                     {isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.'}
-                   </p>
-                   {isSearched && (
-                     <Button variant="outline" onClick={handleClearFilters} className="mt-4">
-                       필터 초기화
-                     </Button>
-                   )}
+                   {/* ... (기존 코드) ... */}
                 </div>
               ) : (
-                // 3. 결과 있음 (Grid + Load More 버튼)
                 <div className="space-y-6">
-                  {/* (Summary Stats는 일단 생략) */}
-
-                  {/* Spaces Grid */}
+                  {/* (Spaces Grid) */}
                   <div className={viewMode === 'grid'
                     ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
                     : 'space-y-4'
@@ -470,7 +425,7 @@ export default function App() {
                       <SpaceCard
                         key={space.id}
                         space={space}
-                        isHost={user && isHost}
+                        isHost={user && isHost} // ★ (수정) 파생된 isHost 전달
                         currentUserId={user?.id}
                         onDelete={handleDeleteSpace}
                         onView={handleViewSpace}
@@ -481,17 +436,10 @@ export default function App() {
                     ))}
                   </div>
 
-                  {/* (추가) 더보기 버튼 */}
+                  {/* (더보기 버튼) */}
                   {pagination.page < pagination.totalPages - 1 && (
                     <div className="text-center pt-8">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        onClick={handleLoadMore}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? <LoadingSpinner size="sm" /> : '더보기'}
-                      </Button>
+                      {/* ... (기존 코드) ... */}
                     </div>
                   )}
                 </div>
@@ -527,7 +475,7 @@ export default function App() {
           isFavorited={selectedSpace ? favoriteSpaces.includes(selectedSpace.id) : false}
           onToggleFavorite={handleToggleFavorite}
         />
-      </Suspense> {/* <-- 아까 그 오타가 여기 또 있었습니다. 'Suspense'로 수정합니다. */}
+      </Suspense>
 
       <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <BookingModal

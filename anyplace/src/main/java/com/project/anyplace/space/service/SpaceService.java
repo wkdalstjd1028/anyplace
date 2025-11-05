@@ -80,6 +80,8 @@ public class SpaceService {
 
     private Space dtoToEntity(SpaceDTO dto) {
         return Space.builder()
+                .id(dto.getId()) // (추가) 업데이트 시 id가 필요합니다.
+                .hostId(dto.getHostId()) // (추가)
                 .name(dto.getName())
                 .type(dto.getType())
                 .description(dto.getDescription())
