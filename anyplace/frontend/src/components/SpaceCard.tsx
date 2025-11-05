@@ -30,15 +30,15 @@ interface SpaceCardProps {
   onToggleFavorite?: (spaceId: string) => void;
 }
 
-export const SpaceCard = React.memo(function SpaceCard({ 
-  space, 
-  isHost, 
-  currentUserId, 
-  onDelete, 
-  onView, 
-  showLoginPrompt, 
-  isFavorited = false, 
-  onToggleFavorite 
+export const SpaceCard = React.memo(function SpaceCard({
+  space,
+  isHost,
+  currentUserId,
+  onDelete,
+  onView,
+  showLoginPrompt,
+  isFavorited = false,
+  onToggleFavorite
 }: SpaceCardProps) {
   const isOwner = isHost && currentUserId === space.hostId;
 
@@ -66,19 +66,19 @@ export const SpaceCard = React.memo(function SpaceCard({
               className="w-8 h-8 bg-white/90 hover:bg-white"
               onClick={() => onToggleFavorite?.(space.id)}
             >
-              <Heart 
-                className={`w-4 h-4 ${isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} 
+              <Heart
+                className={`w-4 h-4 ${isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600'}`}
               />
             </Button>
           )}
         </div>
       </div>
-      
+
       <CardContent className="p-4">
         <div className="space-y-2">
           <h3 className="font-semibold line-clamp-1">{space.title}</h3>
           <p className="text-sm text-muted-foreground line-clamp-2">{space.description}</p>
-          
+
           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
             <div className="flex items-center space-x-1">
               <MapPin className="w-4 h-4" />
@@ -89,7 +89,7 @@ export const SpaceCard = React.memo(function SpaceCard({
               <span>{space.capacity}명</span>
             </div>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1">
               <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -101,19 +101,19 @@ export const SpaceCard = React.memo(function SpaceCard({
           </div>
         </div>
       </CardContent>
-      
+
       <CardFooter className="p-4 pt-0 flex gap-2">
         {isOwner ? (
           <>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex-1"
               onClick={() => onView?.(space.id)}
             >
               수정
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               size="icon"
               onClick={() => onDelete?.(space.id)}
             >
@@ -122,8 +122,8 @@ export const SpaceCard = React.memo(function SpaceCard({
           </>
         ) : (
           <div className="w-full space-y-2">
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               disabled={!space.available}
               onClick={() => onView?.(space.id)}
             >
