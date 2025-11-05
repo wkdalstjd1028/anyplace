@@ -79,11 +79,11 @@ public class UserController {
 
     @PostMapping("/api/user/upgrade-to-host")
     public ResponseEntity<Void> upgradeToHost(
-            @AuthenticationPrincipal OAuth2User oauth2User, // (수정)
-            @Valid @RequestBody UserDTO.HostUpgradeRequest request
+            @AuthenticationPrincipal OAuth2User oauth2User, // (OAuth2User로 수정됨)
+            @Valid @RequestBody UserDTO.HostUpgradeRequest request //
     ) {
-        Long userId = getUserIdFromPrincipal(oauth2User); // (수정)
-        userService.upgradeToHost(userId, request);
+        Long userId = getUserIdFromPrincipal(oauth2User);
+        userService.upgradeToHost(userId, request); //
         return ResponseEntity.ok().build();
     }
 }
