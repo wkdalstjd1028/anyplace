@@ -1,60 +1,72 @@
-import { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Calendar, Clock, MapPin, Users, Phone, Mail, MoreHorizontal, CheckCircle, XCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { Booking, BookingStatus, User } from '../../lib/types'; // (경로 확인!)
+import { LoadingSpinner } from './LoadingSpinner'; // ⭐️ 1. import 구문 추가
 
 interface ReservationDashboardProps {
   isHost: boolean;
-  userId: string;
-  reservations: any[];
-  onUpdateReservation: (reservationId: string, status: string) => void;
+  user: User | null;
+  reservations: Booking[];
+  onUpdateReservation: (reservationId: string, status: 'CONFIRMED' | 'REJECTED') => void;
   onCancelReservation: (reservationId: string) => void;
+  isLoading: boolean;
 }
 
-export function ReservationDashboard({ 
-  isHost, 
-  userId, 
-  reservations, 
-  onUpdateReservation, 
-  onCancelReservation 
+export function ReservationDashboard({
+  isHost,
+  user,
+  reservations,
+  onUpdateReservation,
+  onCancelReservation,
+  isLoading
 }: ReservationDashboardProps) {
-  const getStatusBadge = (status: string) => {
+
+  const getStatusBadge = (status: BookingStatus) => {
     const statusConfig = {
-      pending: { label: '승인 대기', variant: 'secondary' as const },
-      confirmed: { label: '확정', variant: 'default' as const },
-      completed: { label: '완료', variant: 'outline' as const },
-      cancelled: { label: '취소', variant: 'destructive' as const }
+      PENDING: { label: '승인 대기', variant: 'secondary' as const },
+      CONFIRMED: { label: '예약 확정', variant: 'default' as const },
+      COMPLETED: { label: '이용 완료', variant: 'outline' as const },
+      CANCELLED: { label: '취소됨', variant: 'destructive' as const },
+      REJECTED: { label: '거절됨', variant: 'destructive' as const }
     };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+
+    const config = statusConfig[status] || statusConfig.PENDING;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const handleApprove = (reservationId: string) => {
-    onUpdateReservation(reservationId, 'confirmed');
-    toast.success('예약이 승인되었습니다');
+    onUpdateReservation(reservationId, 'CONFIRMED');
   };
 
   const handleReject = (reservationId: string) => {
-    onUpdateReservation(reservationId, 'cancelled');
-    toast.success('예약이 거절되었습니다');
+    onUpdateReservation(reservationId, 'REJECTED');
   };
 
   const handleCancel = (reservationId: string) => {
     onCancelReservation(reservationId);
-    toast.success('예약이 취소되었습니다');
   };
 
-  const userReservations = reservations.filter(r => r.userId === userId);
-  const hostReservations = reservations.filter(r => r.hostId === userId);
+  const pendingReservations = reservations.filter(r => r.status === 'PENDING');
+  const confirmedReservations = reservations.filter(r => r.status === 'CONFIRMED');
 
-  const pendingReservations = hostReservations.filter(r => r.status === 'pending');
-  const confirmedReservations = hostReservations.filter(r => r.status === 'confirmed');
+  // ⭐️ 2. (수정) 64번째 줄의 LoadingSpinner가 이제 정의되었습니다.
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
+  // -------------------------
+  // 1. 호스트 뷰 (isHost === true)
+  // -------------------------
   if (isHost) {
     return (
       <div className="space-y-6">
@@ -73,32 +85,29 @@ export function ReservationDashboard({
               <div className="text-xs text-muted-foreground">확정된 예약</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{hostReservations.length}</div>
+              <div className="text-2xl font-bold text-primary">{reservations.length}</div>
               <div className="text-xs text-muted-foreground">총 예약</div>
             </div>
           </div>
         </div>
 
-        <Tabs defaultValue="pending" className="w-full">
+        <Tabs defaultValue="PENDING" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending">
+            <TabsTrigger value="PENDING">
               승인 대기 ({pendingReservations.length})
             </TabsTrigger>
-            <TabsTrigger value="confirmed">
+            <TabsTrigger value="CONFIRMED">
               확정 예약 ({confirmedReservations.length})
             </TabsTrigger>
-            <TabsTrigger value="all">
-              전체 예약 ({hostReservations.length})
+            <TabsTrigger value="ALL">
+              전체 예약 ({reservations.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending" className="space-y-4">
+          {/* 1-1. 승인 대기 탭 */}
+          <TabsContent value="PENDING" className="space-y-4 mt-4">
             {pendingReservations.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">승인 대기 중인 예약이 없습니다</p>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="p-8 text-center"><p className="text-muted-foreground">승인 대기 중인 예약이 없습니다</p></CardContent></Card>
             ) : (
               pendingReservations.map((reservation) => (
                 <Card key={reservation.id}>
@@ -112,65 +121,47 @@ export function ReservationDashboard({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span>{new Date(reservation.date).toLocaleDateString('ko-KR')}</span>
+                        <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{reservation.startTime} - {reservation.endTime}</span>
+                        <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Users className="w-4 h-4 text-muted-foreground" />
-                        <span>{reservation.headCount}명</span>
+                        <span>{reservation.guests}명</span>
                       </div>
                       <div className="font-semibold">
-                        {reservation.totalAmount?.toLocaleString()}원
+                        {reservation.totalPrice?.toLocaleString()}원
                       </div>
                     </div>
-                    
+
                     <div className="bg-muted/30 p-4 rounded-lg">
                       <div className="flex items-center justify-between mb-3">
                         <div className="space-y-1">
                           <p className="font-medium text-lg">예약자: {reservation.userName}</p>
                           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                             <span className="flex items-center space-x-1">
-                              <Phone className="w-3 h-3" />
-                              <span>{reservation.userPhone || '010-1234-5678'}</span>
-                            </span>
-                            <span className="flex items-center space-x-1">
                               <Mail className="w-3 h-3" />
                               <span>{reservation.userEmail}</span>
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleApprove(reservation.id)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            승인
+                          <Button size="sm" onClick={() => handleApprove(reservation.id)} className="bg-green-600 hover:bg-green-700">
+                            <CheckCircle className="w-4 h-4 mr-1" /> 승인
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleReject(reservation.id)}
-                          >
-                            <XCircle className="w-4 h-4 mr-1" />
-                            거절
+                          <Button size="sm" variant="destructive" onClick={() => handleReject(reservation.id)}>
+                            <XCircle className="w-4 h-4 mr-1" /> 거절
                           </Button>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-muted-foreground">결제 방법:</span>
-                          <span className="ml-2 font-medium">{reservation.paymentMethod}</span>
-                        </div>
-                        <div>
                           <span className="text-muted-foreground">예약 일시:</span>
-                          <span className="ml-2 font-medium">{new Date(reservation.createdAt).toLocaleDateString('ko-KR')}</span>
+                          <span className="ml-2 font-medium">{new Date(reservation.createdAt).toLocaleString('ko-KR')}</span>
                         </div>
                       </div>
                     </div>
@@ -180,13 +171,10 @@ export function ReservationDashboard({
             )}
           </TabsContent>
 
-          <TabsContent value="confirmed" className="space-y-4">
+          {/* 1-2. 확정 예약 탭 */}
+          <TabsContent value="CONFIRMED" className="space-y-4 mt-4">
             {confirmedReservations.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">확정된 예약이 없습니다</p>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="p-8 text-center"><p className="text-muted-foreground">확정된 예약이 없습니다</p></CardContent></Card>
             ) : (
               confirmedReservations.map((reservation) => (
                 <Card key={reservation.id}>
@@ -197,130 +185,89 @@ export function ReservationDashboard({
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span>{new Date(reservation.date).toLocaleDateString('ko-KR')}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{reservation.startTime} - {reservation.endTime}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-muted-foreground" />
-                        <span>{reservation.headCount}명</span>
-                      </div>
-                      <div className="font-semibold">
-                        {reservation.totalAmount?.toLocaleString()}원
-                      </div>
-                    </div>
-                    
-                    <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                      <div className="space-y-1 mb-3">
-                        <p className="font-medium text-lg">예약자: {reservation.userName}</p>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                          <span className="flex items-center space-x-1">
-                            <Phone className="w-3 h-3" />
-                            <span>{reservation.userPhone || '010-1234-5678'}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <Mail className="w-3 h-3" />
-                            <span>{reservation.userEmail}</span>
-                          </span>
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <span>{reservation.guests}명</span>
+                        </div>
+                        <div className="font-semibold">
+                          {reservation.totalPrice?.toLocaleString()}원
                         </div>
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">결제 방법:</span>
-                          <span className="ml-2 font-medium">{reservation.paymentMethod}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">예약 일시:</span>
-                          <span className="ml-2 font-medium">{new Date(reservation.createdAt).toLocaleDateString('ko-KR')}</span>
-                        </div>
+                      <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                        <p className="font-medium text-lg">예약자: {reservation.userName} ({reservation.userEmail})</p>
                       </div>
-                    </div>
                   </CardContent>
                 </Card>
               ))
             )}
           </TabsContent>
 
-          <TabsContent value="all" className="space-y-4">
-            {hostReservations.map((reservation) => (
-              <Card key={reservation.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{reservation.spaceName}</CardTitle>
-                    {getStatusBadge(reservation.status)}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span>{new Date(reservation.date).toLocaleDateString('ko-KR')}</span>
+          {/* 1-3. 전체 예약 탭 */}
+          <TabsContent value="ALL" className="space-y-4 mt-4">
+            {reservations.length === 0 ? (
+              <Card><CardContent className="p-8 text-center"><p className="text-muted-foreground">총 예약 내역이 없습니다</p></CardContent></Card>
+            ) : (
+              reservations.map((reservation) => (
+                <Card key={reservation.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{reservation.spaceName}</CardTitle>
+                      {getStatusBadge(reservation.status)}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span>{reservation.startTime} - {reservation.endTime}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                      <span>{reservation.headCount}명</span>
-                    </div>
-                    <div className="font-semibold">
-                      {reservation.totalAmount?.toLocaleString()}원
-                    </div>
-                  </div>
-                  
-                  <div className="bg-muted/30 p-4 rounded-lg">
-                    <div className="space-y-1 mb-3">
-                      <p className="font-medium text-lg">예약자: {reservation.userName}</p>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span className="flex items-center space-x-1">
-                          <Phone className="w-3 h-3" />
-                          <span>{reservation.userPhone || '010-1234-5678'}</span>
-                        </span>
-                        <span className="flex items-center space-x-1">
-                          <Mail className="w-3 h-3" />
-                          <span>{reservation.userEmail}</span>
-                        </span>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <span>{reservation.guests}명</span>
+                        </div>
+                        <div className="font-semibold">
+                          {reservation.totalPrice?.toLocaleString()}원
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">결제 방법:</span>
-                        <span className="ml-2 font-medium">{reservation.paymentMethod}</span>
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <p className="font-medium text-lg">예약자: {reservation.userName} ({reservation.userEmail})</p>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">예약 일시:</span>
-                        <span className="ml-2 font-medium">{new Date(reservation.createdAt).toLocaleDateString('ko-KR')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </TabsContent>
         </Tabs>
       </div>
     );
   }
 
-  // User view
+  // -----------------------------
+  // 2. 사용자 뷰 (isHost === false)
+  // -----------------------------
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">내 예약</h2>
         <div className="text-sm text-muted-foreground">
-          총 {userReservations.length}건의 예약
+          총 {reservations.length}건의 예약
         </div>
       </div>
 
-      {userReservations.length === 0 ? (
+      {reservations.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground mb-4">예약 내역이 없습니다</p>
@@ -329,7 +276,7 @@ export function ReservationDashboard({
         </Card>
       ) : (
         <div className="space-y-4">
-          {userReservations.map((reservation) => (
+          {reservations.map((reservation) => (
             <Card key={reservation.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -343,13 +290,16 @@ export function ReservationDashboard({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {reservation.status === 'pending' && (
-                          <DropdownMenuItem onClick={() => handleCancel(reservation.id)}>
+                        {(reservation.status === 'PENDING' || reservation.status === 'CONFIRMED') && (
+                          <DropdownMenuItem
+                            onClick={() => handleCancel(reservation.id)}
+                            className="text-red-600"
+                          >
                             예약 취소
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem>
-                          예약 상세보기
+                          예약 상세보기 (TBD)
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -360,24 +310,24 @@ export function ReservationDashboard({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{new Date(reservation.date).toLocaleDateString('ko-KR')}</span>
+                    <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>{reservation.startTime} - {reservation.endTime}</span>
+                    <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Users className="w-4 h-4 text-muted-foreground" />
-                    <span>{reservation.headCount}명</span>
+                    <span>{reservation.guests}명</span>
                   </div>
                   <div className="font-semibold">
-                    {reservation.totalAmount?.toLocaleString()}원
+                    {reservation.totalPrice?.toLocaleString()}원
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <MapPin className="w-4 h-4" />
-                  <span>{reservation.spaceLocation}</span>
+                  <span>{reservation.spaceAddress}</span>
                 </div>
               </CardContent>
             </Card>
@@ -387,3 +337,6 @@ export function ReservationDashboard({
     </div>
   );
 }
+
+// (Suspense를 위해 default export 추가)
+export default ReservationDashboard;

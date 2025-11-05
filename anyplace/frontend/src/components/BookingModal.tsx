@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Clock, Users, MapPin, CreditCard } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner'; // (버전 정보 @2.0.3 제거)
 
 interface BookingModalProps {
   space: any;
@@ -17,7 +17,7 @@ interface BookingModalProps {
 }
 
 const timeSlots = [
-  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', 
+  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
   '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 ];
 
@@ -32,13 +32,14 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
   }
 
   const calculateTotal = () => {
-    if (!startTime || !endTime || !space?.price) return 0;
-    
+    // 1. (수정) space.price -> space.pricePerHour
+    if (!startTime || !endTime || !space?.pricePerHour) return 0;
+
     const start = parseInt(startTime.split(':')[0]);
     const end = parseInt(endTime.split(':')[0]);
     const duration = end - start;
-    
-    return duration > 0 ? duration * space.price : 0;
+
+    return duration > 0 ? duration * space.pricePerHour : 0;
   };
 
   const handleConfirm = () => {
@@ -49,7 +50,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
 
     const start = parseInt(startTime.split(':')[0]);
     const end = parseInt(endTime.split(':')[0]);
-    
+
     if (end <= start) {
       toast.error('종료 시간은 시작 시간보다 늦어야 합니다');
       return;
@@ -57,7 +58,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
 
     const bookingData = {
       spaceId: space?.id || '',
-      spaceName: space?.title || '',
+      spaceName: space?.name || '', // 2. (수정) space.title -> space.name
       date: selectedDate,
       startTime,
       endTime,
@@ -90,12 +91,12 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
           {/* Space Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">{space?.title}</CardTitle>
+              <CardTitle className="text-lg">{space?.name}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4" />
-                <span>{space?.location}</span>
+                <span>{space?.address}</span>
               </div>
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <Users className="w-4 h-4" />
@@ -103,7 +104,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
               </div>
               <div className="flex items-center space-x-2">
                 <span className="text-lg font-semibold">
-                  {space?.price?.toLocaleString()}원/시간
+                  {space?.pricePerHour?.toLocaleString()}원/시간
                 </span>
                 <Badge>{space?.type}</Badge>
               </div>
@@ -149,6 +150,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
                 <SelectTrigger>
                   <SelectValue placeholder="종료 시간 선택" />
                 </SelectTrigger>
+                {/* ⭐️ 4. (오타 수정) </Trigger> -> </SelectTrigger> */}
                 <SelectContent>
                   {availableEndTimes.map((time) => (
                     <SelectItem key={time} value={time}>
