@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, startTransition } from 'react';
 import { Header } from './components/Header';
-import { AuthModal } from './components/AuthModal';
+// import { AuthModal } from './components/AuthModal'; // (삭제) OIDC 로그인을 사용하므로 모달 삭제
 import { SpaceCard } from './components/SpaceCard';
 import { QuickFilter } from './components/QuickFilter';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { Plus, Grid, List, Heart } from 'lucide-react';
-import { toast, Toaster } from 'sonner@2.0.3';
+import { toast, Toaster } from 'sonner'; // (버전 @2.0.3 제거)
 
-// (추가) API 서비스 및 타입 임포트
-// (spaceService.ts가 default export를 사용한다고 가정)
+// (수정) API 서비스 및 타입 임포트
 import spaceService from './service/spaceService';
-// (spaceService.ts가 import하는 공통 타입을 임포트)
+import { getMe } from './service/userService'; // (추가) 로그인 상태 확인 API
 import { Space, SpaceSearchParams, User } from '../lib/types';
 
 // Lazy load heavy components
@@ -22,61 +21,76 @@ const BookingModal = React.lazy(() => import('./components/BookingModal').then(m
 const PaymentModal = React.lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
 const ReservationDashboard = React.lazy(() => import('./components/ReservationDashboard').then(m => ({ default: m.ReservationDashboard })));
 
-// (삭제) Mock data (initialSpaces) 전체 삭제
-
-// (삭제) SearchFilters 인터페이스 (lib/types의 SpaceSearchParams로 대체)
-
 export default function App() {
-  const [user, setUser] = useState<User | null>(null); // (수정) User 타입 적용 (lib/types 가정)
+  const [user, setUser] = useState<User | null>(null);
   const [isHost, setIsHost] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  // const [showAuthModal, setShowAuthModal] = useState(false); // (삭제)
   const [showSpaceRegistration, setShowSpaceRegistration] = useState(false);
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null); // (수정) Space 타입 적용
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [bookingData, setBookingData] = useState(null);
 
-  // --- (수정) API 연동을 위한 상태 ---
-  const [spaces, setSpaces] = useState<Space[]>([]); // API로 받아온 공간 목록
-  const [isLoading, setIsLoading] = useState(true);   // 로딩 상태
+  // --- API 연동 상태 ---
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSearched, setIsSearched] = useState(false);
   const [showAllMode, setShowAllMode] = useState(false);
-
-  // (추가) 페이징 상태
   const [pagination, setPagination] = useState({
     page: 0,
-    size: 20, // (spaceService.ts의 기본값과 일치)
+    size: 20,
     totalPages: 0,
     totalElements: 0
   });
-  // (추가) 현재 적용된 검색 필터 (페이지네이션을 위해 저장)
   const [currentFilters, setCurrentFilters] = useState<SpaceSearchParams>({});
 
-  // (삭제) 'filteredSpaces' 상태 삭제 (서버가 필터링을 담당)
-
-  // (삭제) Mock reservation data (initialReservations) 삭제
-
-  const [reservations, setReservations] = useState([]); // (수정) 초기값 빈 배열
+  const [reservations, setReservations] = useState([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [currentView, setCurrentView] = useState('home');
   const [favoriteSpaces, setFavoriteSpaces] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
-  // (추가) API로부터 데이터를 가져오는 핵심 함수
+  // (수정) OIDC 로그인 핸들러 (모달 대신 리디렉션)
+  const handleOidcLogin = useCallback(() => {
+    // 'google'은 application.yml에 설정한 provider-id입니다. (naver, kakao 등)
+    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+  }, []);
+
+  // (수정) OIDC 로그아웃 핸들러 (서버 로그아웃 호출)
+  const handleLogout = useCallback(() => {
+    // Spring Security 기본 로그아웃 URL
+    // 성공 시 Spring이 localhost:3000으로 리디렉션
+    window.location.href = 'http://localhost:8080/logout';
+    // (참고: SecurityConfig에서 .logout() 설정을 커스텀했다면 주소 변경 필요)
+  }, []);
+
+  // (추가) 로그인 상태 확인 (페이지 로드 시)
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const userData = await getMe(); // (서버의 /api/me 호출)
+        setUser(userData);
+      } catch (error) {
+        // 401 오류(로그인 안 됨) 등이 발생하면 user는 null로 유지됩니다.
+        console.log("Not logged in (this is normal)");
+      }
+    };
+    checkLoginStatus();
+  }, []); // 빈 배열: 컴포넌트 마운트 시 1회 실행
+
+  // 공간 데이터 불러오기
   const fetchSpaces = useCallback(async (params: SpaceSearchParams) => {
     setIsLoading(true);
     try {
-      // (중요) 'spaceService'를 사용하여 실제 API 호출
       const response = await spaceService.searchSpaces(params);
 
-      // 새 검색인 경우(page 0) 데이터 교체, 아니면 추가 (더보기)
+      // (수정) response.data가 아닌 response 자체를 사용 (spaceService.ts 수정됨)
       if (params.page === 0 || params.page === undefined) {
         setSpaces(response.content);
       } else {
         setSpaces(prev => [...prev, ...response.content]);
       }
-
       setPagination({
         page: response.number,
         size: response.size,
@@ -86,13 +100,14 @@ export default function App() {
 
     } catch (err) {
       console.error("API Error fetching spaces:", err);
+      // 'content'를 못 읽는 오류가 여기서 발생했었음 (spaceService 수정으로 해결됨)
       toast.error('공간 정보를 불러오는 데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // (수정) 컴포넌트 마운트 시 첫 페이지 데이터 로드 + LocalStorage
+  // 컴포넌트 마운트 시 첫 페이지 데이터 로드 + LocalStorage
   useEffect(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
     fetchSpaces(initialParams);
@@ -106,7 +121,7 @@ export default function App() {
     if (savedRecentlyViewed) {
       setRecentlyViewed(JSON.parse(savedRecentlyViewed));
     }
-  }, [fetchSpaces, pagination.size]); // (수정) 의존성 배열
+  }, [fetchSpaces, pagination.size]);
 
   useEffect(() => {
     localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces));
@@ -116,37 +131,24 @@ export default function App() {
     localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed));
   }, [recentlyViewed]);
 
-  const handleLogin = useCallback((userData: any) => {
-    setUser(userData);
-    setShowAuthModal(false);
-  }, []);
-
-  const handleLogout = useCallback(() => {
-    setUser(null);
-    setIsHost(false);
-    toast.success('로그아웃되었습니다');
-  }, []);
+  // (삭제) handleLogin (AuthModal용)
 
   const handleToggleHostMode = useCallback(() => {
     setIsHost(!isHost);
     toast.success(isHost ? '게스트 모드로 전환되었습니다' : '호스트 모드로 전환되었습니다');
   }, [isHost]);
 
-  // (수정) 공간 등록: API 호출로 변경
   const handleSpaceRegistration = async (spaceData: any) => {
-    // (참고) spaceData를 spaceService.ts의 'SpaceCreateRequest' 타입으로 변환 필요
     try {
       const newSpace = await spaceService.createSpace(spaceData);
-      setSpaces(prev => [newSpace, ...prev]); // 새 공간을 목록 맨 위에 추가
+      setSpaces(prev => [newSpace, ...prev]);
       toast.success('공간이 성공적으로 등록되었습니다.');
     } catch (err) {
       toast.error('공간 등록에 실패했습니다.');
     }
   };
 
-  // (수정) 공간 삭제: API 호출로 변경
   const handleDeleteSpace = async (spaceId: string) => {
-    // (참고) window.confirm 대신 toast.confirm 사용 권장
     if (window.confirm("정말로 이 공간을 삭제하시겠습니까?")) {
       try {
         await spaceService.deleteSpace(spaceId);
@@ -158,9 +160,6 @@ export default function App() {
     }
   };
 
-  // (삭제) 'handleSearch' (복잡한 버전) 함수 삭제
-
-  // (수정) 필터 클리어: API를 다시 호출
   const handleClearFilters = useCallback(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
     fetchSpaces(initialParams);
@@ -175,37 +174,29 @@ export default function App() {
     setShowAllMode(true);
   };
 
-  // (수정) 'QuickFilter' 핸들러: API 호출로 변경
+  // 'QuickFilter' 핸들러 (수정 없음)
   const handleQuickFilter = useCallback((filters: {
     date: string;
     location: string;
     capacity: number;
     spaceType: string;
   }) => {
-
-    // QuickFilter의 간단한 필터를 백엔드 API가 이해하는 SpaceSearchParams로 변환
     const params: SpaceSearchParams = {
       page: 0,
       size: pagination.size,
       sort: 'createdAt,desc',
-
-      // (가정) QuickFilter의 'location'은 'district' (자치구)입니다.
       district: filters.location || undefined,
-      // (가정) 'city'는 '서울'로 고정합니다 (spaceService 스펙에 따름)
-      city: filters.location ? '서울' : undefined,
-
+      // (참고) location이 '시/도'를 포함해야 city도 동적으로 설정 가능
+      city: filters.location ? '서울' : undefined, // (임시)
       type: filters.spaceType || undefined,
       minCapacity: filters.capacity > 0 ? filters.capacity : undefined,
-
       checkInDate: filters.date || undefined,
-      // (참고) checkOutDate가 없으므로, 백엔드 SpaceSpecification.java에서
-      // checkInDate만 있는 경우도 처리하도록 수정이 필요할 수 있습니다.
-      // (현재는 checkInDate와 checkOutDate가 모두 있어야 날짜 필터링 작동)
+      // (참고) checkOutDate가 현재 필터에 없음
     };
 
     setIsSearched(true);
-    fetchSpaces(params);    // API 호출
-    setCurrentFilters(params); // 현재 필터 상태 저장
+    fetchSpaces(params);
+    setCurrentFilters(params);
 
     setTimeout(() => {
       const searchResultsElement = document.getElementById('search-results-section');
@@ -242,7 +233,6 @@ export default function App() {
     });
   };
 
-  // (수정) handlePaymentSuccess: API 데이터 속성 이름으로 변경
   const handlePaymentSuccess = (paymentInfo: any) => {
     const newReservation = {
       id: `reservation_${Date.now()}`,
@@ -252,23 +242,20 @@ export default function App() {
       userName: user?.name,
       userEmail: user?.email,
       hostId: selectedSpace?.hostId,
-      spaceLocation: selectedSpace?.address, // (수정) location -> address
+      spaceLocation: selectedSpace?.address,
       status: 'pending'
     };
-
     setReservations([...reservations, newReservation]);
     setShowPaymentModal(false);
     setSelectedSpace(null);
     setBookingData(null);
     toast.success('예약이 완료되었습니다!');
-    // (권장) bookingService.createBooking API 호출 필요
   };
 
-  const handleUpdateReservation = (reservationId: string, status: string) => { /* ... (유지) ... */ };
-  const handleCancelReservation = (reservationId: string) => { /* ... (유지) ... */ };
-  const handleNavigate = (view: string) => { /* ... (유지) ... */ };
+  const handleUpdateReservation = (reservationId: string, status: string) => { /* ... */ };
+  const handleCancelReservation = (reservationId: string) => { /* ... */ };
+  const handleNavigate = (view: string) => { setCurrentView(view); };
 
-  // (수정) handleResetToHome: 필터 클리어 함수를 호출하도록 수정
   const handleResetToHome = useCallback(() => {
     setCurrentView('home');
     setShowSpaceDetail(false);
@@ -277,16 +264,15 @@ export default function App() {
     setShowSpaceRegistration(false);
     setSelectedSpace(null);
     setBookingData(null);
-    handleClearFilters(); // (수정)
+    handleClearFilters();
     toast.success('홈으로 돌아왔습니다');
   }, [handleClearFilters]);
 
-  const handleToggleFavorite = useCallback((spaceId: string) => { /* ... (유지) ... */ }, [user]);
-  const addToRecentlyViewed = useCallback((spaceId: string) => { /* ... (유지) ... */ }, []);
+  const handleToggleFavorite = useCallback((spaceId: string) => { /* ... */ }, []);
+  const addToRecentlyViewed = useCallback((spaceId: string) => { /* ... */ }, []);
 
-  // (수정) mySpaces, displaySpaces: 'filteredSpaces' 대신 'spaces' 사용
   const mySpaces = useMemo(() =>
-    isHost ? spaces.filter(space => String(space.hostId) === user?.id) : [], // (수정) ID 타입 비교
+    isHost ? spaces.filter(space => String(space.hostId) === user?.id) : [],
     [isHost, spaces, user?.id]
   );
   const displaySpaces = useMemo(() =>
@@ -294,7 +280,7 @@ export default function App() {
     [isHost, mySpaces, spaces]
   );
 
-  // (수정) 추천/인기 공간: API에서 온 'spaces'를 사용 (Props 이름 변경됨)
+  // (추천/인기/최근 본 공간 로직 - spaceService에 전용 API가 있으나 일단 유지)
   const recommendedSpaces = useMemo(() =>
     spaces
       .filter(space => space.available ?? true)
@@ -317,14 +303,13 @@ export default function App() {
     [recentlyViewed, spaces]
   );
 
-  // (추가) '더보기' 버튼 핸들러
   const handleLoadMore = () => {
     if (pagination.page < pagination.totalPages - 1) {
       const nextParams = {
         ...currentFilters,
         page: pagination.page + 1
       };
-      fetchSpaces(nextParams); // fetchSpaces가 데이터를 '추가'하도록 수정됨
+      fetchSpaces(nextParams);
     }
   };
 
@@ -332,8 +317,8 @@ export default function App() {
     <div className="min-h-screen bg-background">
       <Header
         user={user}
-        onLogin={() => setShowAuthModal(true)}
-        onLogout={handleLogout}
+        onLogin={handleOidcLogin} // (수정) OIDC 로그인 함수 연결
+        onLogout={handleLogout} // (수정) OIDC 로그아웃 함수 연결
         onToggleHostMode={handleToggleHostMode}
         isHost={isHost}
         onNavigate={handleNavigate}
@@ -342,18 +327,57 @@ export default function App() {
       />
 
       <main className="container mx-auto px-4 py-8">
-        {/* ... (Reservations View, Favorites View 유지) ... */}
+        {currentView === 'reservations' && (
+          <Suspense fallback={<LoadingSpinner size="lg" />}>
+            <ReservationDashboard
+              reservations={reservations}
+              onUpdateReservation={handleUpdateReservation}
+              onCancelReservation={handleCancelReservation}
+              isHost={isHost}
+            />
+          </Suspense>
+        )}
+
+        {currentView === 'favorites' && (
+          <div>{/* 찜한 공간 뷰 (나중에 구현) */}</div>
+        )}
 
         {/* Home View */}
         {currentView === 'home' && (
           <>
-            {/* ... (Hero, Host Actions, Search Section, Login Prompt 유지) ... */}
+            {/* ★★★ 1. (추가) Hero 섹션 ★★★ */}
+            <div className="text-center pt-16 pb-12">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">
+                어떤 공간이든, anyplace에서
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                회의실, 파티룸, 녹음실부터 연습실까지 - 필요한 모든 공간을 anyplace에서 찾아보세요
+              </p>
+            </div>
 
-            {/* ... (Personalized Sections Container 유지) ... */}
+            {/* ★★★ 2. (추가) QuickFilter 컴포넌트 ★★★ */}
+            <div className="mb-12">
+              <QuickFilter onSearch={handleQuickFilter} />
+            </div>
+
+            {/* ★★★ 3. (추가) 로그인 유도 (피그마 디자인) ★★★ */}
+            {!user && (
+              <div className="text-center mb-12">
+                <Button size="lg" onClick={handleOidcLogin}>
+                  로그인하고 시작하기
+                </Button>
+                <p className="text-sm text-muted-foreground mt-2">
+                  또는 아래에서 바로 공간을 둘러보세요
+                </p>
+              </div>
+            )}
+
+            {/* ... (Personalized Sections - 일단 주석 처리) ... */}
 
             {/* (수정) Search Results Alert: pagination.totalElements 사용 */}
             {isSearched && !showAllMode && !isHost && (
-              <div className="bg-gradient-to-r ... (유지)" id="search-results-section">
+              // (수정) Tailwind 클래스 추가
+              <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20" id="search-results-section">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-bold text-primary">검색 결과</h3>
@@ -373,18 +397,43 @@ export default function App() {
             )}
 
             {/* Spaces Section */}
-            <div className="bg-gradient-to-br ... (유지)" id="spaces-section">
-              {/* ... (Section Header 유지) ... */}
+            {/* (수정) Tailwind 클래스 추가 */}
+            <div className="p-6 rounded-xl border bg-card/50" id="spaces-section">
+              {/* (수정) Section Header UI */}
+               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                <div>
+                  <h3 className="text-2xl font-semibold">
+                    {isHost ? '내 공간 관리' : (isSearched ? '공간 목록' : '전체 공간')}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {isHost ? '등록한 공간을 확인하고 관리하세요' : (isSearched ? '검색 조건에 맞는 공간입니다' : 'anyplace에 등록된 전체 공간입니다')}
+                  </p>
+                </div>
+                 {isHost && (
+                  <Button onClick={() => setShowSpaceRegistration(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    새 공간 등록
+                  </Button>
+                )}
+              </div>
 
               {/* (수정) Filter Status: pagination.totalElements 사용 */}
-              <div className="flex flex-col sm:flex-row ... (유지)">
+              <div className="flex flex-col sm:flex-row justify-between items-center mb-4 pb-4 border-b">
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className="text-sm font-medium">
                     {pagination.totalElements}개 공간
                   </Badge>
-                  {/* ... (필터 상태 Badge UI 유지) ... */}
+                  {/* (필터 Badge UI는 일단 생략) */}
                 </div>
-                {/* ... (View Mode Buttons 유지) ... */}
+                {/* (View Mode Buttons) */}
+                <div className="flex items-center gap-2 mt-3 sm:mt-0">
+                  <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('grid')}>
+                    <Grid className="w-4 h-4" />
+                  </Button>
+                  <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')}>
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
 
               {/* (수정) Spaces Content: 로딩 및 빈 상태 처리 */}
@@ -395,41 +444,21 @@ export default function App() {
                 </div>
               ) : !isLoading && spaces.length === 0 ? (
                 // 2. 로딩 후 결과 없음
-                <div className="text-center py-16 ... (유지)">
-                  {/* ... (결과 없음 UI 유지) ... */}
+                <div className="text-center py-16">
+                   <h4 className="text-xl font-medium mb-2">결과 없음</h4>
+                   <p className="text-muted-foreground">
+                     {isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.'}
+                   </p>
+                   {isSearched && (
+                     <Button variant="outline" onClick={handleClearFilters} className="mt-4">
+                       필터 초기화
+                     </Button>
+                   )}
                 </div>
               ) : (
                 // 3. 결과 있음 (Grid + Load More 버튼)
                 <div className="space-y-6">
-                  {/* ... (Summary Stats 수정) ... */}
-                  {!isHost && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-background/30 rounded-xl">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">
-                          {displaySpaces.filter(s => s.available ?? true).length}
-                        </div>
-                        <div className="text-xs text-muted-foreground">예약 가능</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-chart-1">
-                          {displaySpaces.filter(s => (s.rating ?? 0) >= 4.5).length}
-                        </div>
-                        <div className="text-xs text-muted-foreground">고평점 공간</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-chart-2">
-                          {new Set(displaySpaces.map(s => s.address)).size}
-                        </div>
-                        <div className="text-xs text-muted-foreground">지역</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-chart-4">
-                          {new Set(displaySpaces.map(s => s.type)).size}
-                        </div>
-                        <div className="text-xs text-muted-foreground">공간 유형</div>
-                      </div>
-                    </div>
-                  )}
+                  {/* (Summary Stats는 일단 생략) */}
 
                   {/* Spaces Grid */}
                   <div className={viewMode === 'grid'
@@ -439,7 +468,7 @@ export default function App() {
                     {displaySpaces.map((space) => (
                       <SpaceCard
                         key={space.id}
-                        space={space} // (중요) API 데이터(Space 타입)를 전달
+                        space={space}
                         isHost={user && isHost}
                         currentUserId={user?.id}
                         onDelete={handleDeleteSpace}
@@ -457,7 +486,7 @@ export default function App() {
                       <Button
                         variant="outline"
                         size="lg"
-                        onClick={handleLoadMore} // (수정)
+                        onClick={handleLoadMore}
                         disabled={isLoading}
                       >
                         {isLoading ? <LoadingSpinner size="sm" /> : '더보기'}
@@ -471,14 +500,16 @@ export default function App() {
         )}
       </main>
 
-      {/* ... (Modals, Toaster 유지) ... */}
-       <AuthModal
+      {/* (삭제) AuthModal */}
+      {/*
+      <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onLogin={handleLogin}
       />
+      */}
 
-      <Suspense fallback={<div />}>
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <SpaceRegistration
           isOpen={showSpaceRegistration}
           onClose={() => setShowSpaceRegistration(false)}
@@ -486,7 +517,7 @@ export default function App() {
         />
       </Suspense>
 
-      <Suspense fallback={<div />}>
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <SpaceDetail
           space={selectedSpace}
           isOpen={showSpaceDetail}
@@ -498,7 +529,7 @@ export default function App() {
         />
       </Suspense>
 
-      <Suspense fallback={<div />}>
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <BookingModal
           space={selectedSpace}
           isOpen={showBookingModal}
@@ -507,7 +538,7 @@ export default function App() {
         />
       </Suspense>
 
-      <Suspense fallback={<div />}>
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <PaymentModal
           bookingData={bookingData}
           isOpen={showPaymentModal}
