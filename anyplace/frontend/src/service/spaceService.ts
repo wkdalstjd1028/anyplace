@@ -1,11 +1,13 @@
+// spaceService.ts (수정된 코드)
+
 import apiClient from '../lib/api';
-import { 
-  Space, 
-  SpaceCreateRequest, 
-  SpaceUpdateRequest, 
+import {
+  Space,
+  SpaceCreateRequest,
+  SpaceUpdateRequest,
   SpaceSearchParams,
   PaginatedResponse,
-  ApiResponse 
+  ApiResponse // 이 타입은 사실상 사용되지 않지만, 호환성을 위해 남겨둘 수 있습니다.
 } from '../lib/types';
 
 /**
@@ -16,7 +18,8 @@ const spaceService = {
    * 공간 목록 조회 (검색 포함)
    */
   searchSpaces: async (params: SpaceSearchParams = {}): Promise<PaginatedResponse<Space>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Space>>>('/spaces', {
+    // ★★★ 수정: 반환 타입을 PaginatedResponse<Space>로 직접 받습니다.
+    const response = await apiClient.get<PaginatedResponse<Space>>('/api/spaces', {
       params: {
         keyword: params.keyword,
         city: params.city,
@@ -33,147 +36,113 @@ const spaceService = {
       },
     });
 
-    return response.data.data;
+    // ★★★ 수정: response.data.data가 아닌 response.data를 반환합니다.
+    return response.data;
   },
 
   /**
    * 공간 상세 조회
    */
   getSpaceById: async (spaceId: string): Promise<Space> => {
-    const response = await apiClient.get<ApiResponse<Space>>(`/spaces/${spaceId}`);
-    return response.data.data;
+    // ★★★ 수정: 반환 타입을 Space로 직접 받습니다.
+    const response = await apiClient.get<Space>(`/api/spaces/${spaceId}`);
+    // ★★★ 수정: response.data를 반환합니다.
+    return response.data;
   },
 
   /**
    * 공간 등록 (호스트 전용)
    */
   createSpace: async (data: SpaceCreateRequest): Promise<Space> => {
-    const response = await apiClient.post<ApiResponse<Space>>('/spaces', data);
-    return response.data.data;
+    // ★★★ 수정: 반환 타입을 Space로 직접 받습니다.
+    const response = await apiClient.post<Space>('/api/spaces', data);
+    // ★★★ 수정: response.data를 반환합니다.
+    return response.data;
   },
 
   /**
    * 공간 수정 (호스트 전용)
    */
   updateSpace: async (spaceId: string, data: SpaceUpdateRequest): Promise<Space> => {
-    const response = await apiClient.put<ApiResponse<Space>>(`/spaces/${spaceId}`, data);
-    return response.data.data;
+    // ★★★ 수정: 반환 타입을 Space로 직접 받습니다.
+    const response = await apiClient.put<Space>(`/api/spaces/${spaceId}`, data);
+    // ★★★ 수정: response.data를 반환합니다.
+    return response.data;
   },
 
   /**
    * 공간 삭제 (호스트 전용)
    */
   deleteSpace: async (spaceId: string): Promise<void> => {
-    await apiClient.delete(`/spaces/${spaceId}`);
+    // ★★★ 수정: 반환값이 없으므로 .data 접근 불필요
+    await apiClient.delete(`/api/spaces/${spaceId}`);
   },
 
-  /**
-   * 공간 활성화/비활성화 (호스트 전용)
-   */
+  // --- (참고: 아래 함수들은 SpaceController.java에 정의되지 않았습니다.) ---
+  // --- (만약 컨트롤러에 추가한다면, 아래와 같이 수정해야 합니다.) ---
+
   toggleSpaceStatus: async (spaceId: string, isActive: boolean): Promise<Space> => {
-    const response = await apiClient.patch<ApiResponse<Space>>(`/spaces/${spaceId}/status`, {
+    const response = await apiClient.patch<Space>(`/api/spaces/${spaceId}/status`, {
       isActive,
     });
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 내가 등록한 공간 목록 (호스트 전용)
-   */
   getMySpaces: async (page = 0, size = 20): Promise<PaginatedResponse<Space>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Space>>>('/spaces/my', {
+    const response = await apiClient.get<PaginatedResponse<Space>>('/api/spaces/my', {
       params: { page, size },
     });
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 추천 공간 목록
-   */
   getRecommendedSpaces: async (limit = 8): Promise<Space[]> => {
-    const response = await apiClient.get<ApiResponse<Space[]>>('/spaces/recommended', {
+    const response = await apiClient.get<Space[]>('/api/spaces/recommended', {
       params: { limit },
     });
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 인기 공간 목록 (평점 및 리뷰 기반)
-   */
   getPopularSpaces: async (limit = 8): Promise<Space[]> => {
-    const response = await apiClient.get<ApiResponse<Space[]>>('/spaces/popular', {
+    const response = await apiClient.get<Space[]>('/api/spaces/popular', {
       params: { limit },
     });
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 특정 지역의 공간 목록
-   */
   getSpacesByLocation: async (city: string, district?: string, page = 0, size = 20): Promise<PaginatedResponse<Space>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Space>>>('/spaces', {
-      params: {
-        city,
-        district,
-        page,
-        size,
-      },
+    const response = await apiClient.get<PaginatedResponse<Space>>('/api/spaces', {
+      params: { city, district, page, size },
     });
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 공간 타입별 목록
-   */
   getSpacesByType: async (type: string, page = 0, size = 20): Promise<PaginatedResponse<Space>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Space>>>('/spaces', {
-      params: {
-        type,
-        page,
-        size,
-      },
+    const response = await apiClient.get<PaginatedResponse<Space>>('/api/spaces', {
+      params: { type, page, size },
     });
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 이미지 업로드
-   */
   uploadImages: async (files: File[]): Promise<string[]> => {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('images', file);
     });
-
-    const response = await apiClient.post<ApiResponse<string[]>>('/spaces/images', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await apiClient.post<string[]>('/api/spaces/images', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-
-    return response.data.data;
+    return response.data;
   },
 
-  /**
-   * 이미지 삭제
-   */
   deleteImage: async (imageUrl: string): Promise<void> => {
-    await apiClient.delete('/spaces/images', {
+    await apiClient.delete('/api/spaces/images', {
       data: { imageUrl },
     });
   },
 
-  /**
-   * 공간 통계 (호스트 전용)
-   */
-  getSpaceStatistics: async (spaceId: string): Promise<{
-    totalBookings: number;
-    totalRevenue: number;
-    averageRating: number;
-    reviewCount: number;
-  }> => {
-    const response = await apiClient.get<ApiResponse<any>>(`/spaces/${spaceId}/statistics`);
-    return response.data.data;
+  getSpaceStatistics: async (spaceId: string): Promise<any> => {
+    const response = await apiClient.get<any>(`/api/spaces/${spaceId}/statistics`);
+    return response.data;
   },
 };
 
