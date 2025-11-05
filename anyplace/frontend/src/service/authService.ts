@@ -1,134 +1,64 @@
-import apiClient, { setTokens, clearTokens } from '../lib/api';
-import { 
-  LoginRequest, 
-  LoginResponse, 
-  TokenRefreshRequest, 
-  TokenRefreshResponse,
-  User,
-  ApiResponse 
-} from '../lib/types';
+import apiClient from '../lib/api';
+import { User } from '../lib/types'; // (User 타입이 정의된 곳)
 
 /**
- * 인증 관련 API 서비스
+ * 인증 관련 API 서비스 (OIDC 세션 방식)
  */
 const authService = {
   /**
-   * 소셜 로그인 (OIDC)
+   * 현재 로그인한 사용자 정보 조회
+   * (Spring Boot의 /api/me 호출)
    */
-  login: async (provider: 'GOOGLE' | 'KAKAO' | 'NAVER', code: string, redirectUri: string): Promise<LoginResponse> => {
-    const request: LoginRequest = {
-      provider,
-      code,
-      redirectUri,
-    };
+  getCurrentUser: async (): Promise<User> => {
+    // ★★★ 수정: /auth/me -> /api/me, .data.data -> .data
+    const response = await apiClient.get<User>('/api/me');
+    return response.data;
+  },
 
-    const response = await apiClient.post<ApiResponse<LoginResponse>>('/auth/login', request);
-    const { accessToken, refreshToken, user } = response.data.data;
-
-    // 토큰과 사용자 정보 저장
-    setTokens(accessToken, refreshToken);
-    localStorage.setItem('user', JSON.stringify(user));
-
-    return response.data.data;
+  /**
+   * OIDC 소셜 로그인 페이지로 이동
+   */
+  redirectToOidcLogin: (provider: 'google' | 'naver' | 'kakao') => {
+    // ★★★ 수정: Spring Security OIDC 엔드포인트로 리디렉션
+    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`;
   },
 
   /**
    * 로그아웃
    */
   logout: async (): Promise<void> => {
-    try {
-      await apiClient.post('/auth/logout');
-    } finally {
-      // 실패하더라도 로컬 데이터는 삭제
-      clearTokens();
-    }
+    // ★★★ 수정: Spring Security 기본 /logout 엔드포인트로 리디렉션
+    window.location.href = 'http://localhost:8080/logout';
   },
 
   /**
-   * 토큰 갱신
-   */
-  refreshToken: async (refreshToken: string): Promise<TokenRefreshResponse> => {
-    const request: TokenRefreshRequest = { refreshToken };
-    const response = await apiClient.post<ApiResponse<TokenRefreshResponse>>('/auth/refresh', request);
-    
-    const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-    setTokens(accessToken, newRefreshToken);
-
-    return response.data.data;
-  },
-
-  /**
-   * 현재 로그인한 사용자 정보 조회
-   */
-  getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get<ApiResponse<User>>('/auth/me');
-    const user = response.data.data;
-
-    // 사용자 정보 갱신
-    localStorage.setItem('user', JSON.stringify(user));
-
-    return user;
-  },
-
-  /**
-   * 회원 탈퇴
+   * 회원 탈퇴 (Spring Boot에 /api/account 엔드포인트가 필요합니다)
    */
   deleteAccount: async (): Promise<void> => {
-    await apiClient.delete('/auth/account');
-    clearTokens();
+    // ★★★ 수정: API 경로 변경
+    await apiClient.delete('/api/account');
+    // (토큰 로직 삭제)
   },
 
   /**
-   * 소셜 로그인 URL 생성 (프론트엔드에서 사용)
+   * 사용자 역할 확인 (App.tsx의 user 객체를 받아와야 함)
    */
-  getSocialLoginUrl: (provider: 'GOOGLE' | 'KAKAO' | 'NAVER'): string => {
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    
-    const urls: Record<string, string> = {
-      GOOGLE: `https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_GOOGLE_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile`,
-      KAKAO: `https://kauth.kakao.com/oauth/authorize?client_id=YOUR_KAKAO_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`,
-      NAVER: `https://nid.naver.com/oauth2.0/authorize?client_id=YOUR_NAVER_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=RANDOM_STATE`,
-    };
-
-    return urls[provider];
-  },
-
-  /**
-   * 로컬스토리지에서 사용자 정보 가져오기
-   */
-  getStoredUser: (): User | null => {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
-    
-    try {
-      return JSON.parse(userStr);
-    } catch {
-      return null;
-    }
-  },
-
-  /**
-   * 사용자 역할 확인
-   */
-  hasRole: (role: 'USER' | 'HOST' | 'ADMIN'): boolean => {
-    const user = authService.getStoredUser();
+  hasRole: (user: User | null, role: 'ROLE_GUEST' | 'ROLE_HOST' | 'ROLE_ADMIN'): boolean => {
     return user?.role === role;
   },
 
   /**
-   * 호스트 권한 확인
+   * 호스트 권한 확인 (App.tsx의 user 객체를 받아와야 함)
    */
-  isHost: (): boolean => {
-    const user = authService.getStoredUser();
-    return user?.role === 'HOST' || user?.role === 'ADMIN';
+  isHost: (user: User | null): boolean => {
+    return user?.role === 'ROLE_HOST' || user?.role === 'ROLE_ADMIN';
   },
 
   /**
-   * 관리자 권한 확인
+   * 관리자 권한 확인 (App.tsx의 user 객체를 받아와야 함)
    */
-  isAdmin: (): boolean => {
-    const user = authService.getStoredUser();
-    return user?.role === 'ADMIN';
+  isAdmin: (user: User | null): boolean => {
+    return user?.role === 'ROLE_ADMIN';
   },
 };
 

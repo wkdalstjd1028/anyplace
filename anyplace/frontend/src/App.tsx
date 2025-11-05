@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, startTransition } from 'react';
 import { Header } from './components/Header';
-// import { AuthModal } from './components/AuthModal'; // (삭제) OIDC 로그인을 사용하므로 모달 삭제
+// AuthModal (삭제)
 import { SpaceCard } from './components/SpaceCard';
 import { QuickFilter } from './components/QuickFilter';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { Plus, Grid, List, Heart } from 'lucide-react';
-import { toast, Toaster } from 'sonner'; // (버전 @2.0.3 제거)
+import { toast, Toaster } from 'sonner';
 
 // (수정) API 서비스 및 타입 임포트
 import spaceService from './service/spaceService';
-import { getMe } from './service/userService'; // (추가) 로그인 상태 확인 API
+// import { getMe } from './service/userService'; // (삭제)
+import authService from './service/authService'; // (추가) authService 임포트
 import { Space, SpaceSearchParams, User } from '../lib/types';
 
 // Lazy load heavy components
@@ -24,7 +25,7 @@ const ReservationDashboard = React.lazy(() => import('./components/ReservationDa
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isHost, setIsHost] = useState(false);
-  // const [showAuthModal, setShowAuthModal] = useState(false); // (삭제)
+  // showAuthModal (삭제)
   const [showSpaceRegistration, setShowSpaceRegistration] = useState(false);
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -51,25 +52,22 @@ export default function App() {
   const [favoriteSpaces, setFavoriteSpaces] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
-  // (수정) OIDC 로그인 핸들러 (모달 대신 리디렉션)
+  // (수정) OIDC 로그인 핸들러 (authService 사용)
   const handleOidcLogin = useCallback(() => {
     // 'google'은 application.yml에 설정한 provider-id입니다. (naver, kakao 등)
-    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+    authService.redirectToOidcLogin('google');
   }, []);
 
-  // (수정) OIDC 로그아웃 핸들러 (서버 로그아웃 호출)
+  // (수정) OIDC 로그아웃 핸들러 (authService 사용)
   const handleLogout = useCallback(() => {
-    // Spring Security 기본 로그아웃 URL
-    // 성공 시 Spring이 localhost:3000으로 리디렉션
-    window.location.href = 'http://localhost:8080/logout';
-    // (참고: SecurityConfig에서 .logout() 설정을 커스텀했다면 주소 변경 필요)
+    authService.logout();
   }, []);
 
-  // (추가) 로그인 상태 확인 (페이지 로드 시)
+  // (수정) 로그인 상태 확인 (authService 사용)
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const userData = await getMe(); // (서버의 /api/me 호출)
+        const userData = await authService.getCurrentUser(); // (수정) /api/me 호출
         setUser(userData);
       } catch (error) {
         // 401 오류(로그인 안 됨) 등이 발생하면 user는 null로 유지됩니다.
@@ -85,7 +83,7 @@ export default function App() {
     try {
       const response = await spaceService.searchSpaces(params);
 
-      // (수정) response.data가 아닌 response 자체를 사용 (spaceService.ts 수정됨)
+      // (수정됨) response.data가 아닌 response 자체를 사용
       if (params.page === 0 || params.page === undefined) {
         setSpaces(response.content);
       } else {
@@ -100,7 +98,6 @@ export default function App() {
 
     } catch (err) {
       console.error("API Error fetching spaces:", err);
-      // 'content'를 못 읽는 오류가 여기서 발생했었음 (spaceService 수정으로 해결됨)
       toast.error('공간 정보를 불러오는 데 실패했습니다.');
     } finally {
       setIsLoading(false);
@@ -121,7 +118,7 @@ export default function App() {
     if (savedRecentlyViewed) {
       setRecentlyViewed(JSON.parse(savedRecentlyViewed));
     }
-  }, [fetchSpaces, pagination.size]);
+  }, [fetchSpaces, pagination.size]); // (수정) 의존성 배열 fetchSpaces 추가
 
   useEffect(() => {
     localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces));
@@ -131,9 +128,9 @@ export default function App() {
     localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed));
   }, [recentlyViewed]);
 
-  // (삭제) handleLogin (AuthModal용)
-
   const handleToggleHostMode = useCallback(() => {
+    // (참고) 실제 호스트 전환 로직은 API 호출이 필요할 수 있습니다.
+    // (UserService의 upgradeToHost API 호출 등)
     setIsHost(!isHost);
     toast.success(isHost ? '게스트 모드로 전환되었습니다' : '호스트 모드로 전환되었습니다');
   }, [isHost]);
@@ -174,7 +171,7 @@ export default function App() {
     setShowAllMode(true);
   };
 
-  // 'QuickFilter' 핸들러 (수정 없음)
+  // 'QuickFilter' 핸들러
   const handleQuickFilter = useCallback((filters: {
     date: string;
     location: string;
@@ -187,7 +184,7 @@ export default function App() {
       sort: 'createdAt,desc',
       district: filters.location || undefined,
       // (참고) location이 '시/도'를 포함해야 city도 동적으로 설정 가능
-      city: filters.location ? '서울' : undefined, // (임시)
+      // city: filters.location ? '서울' : undefined, // (임시)
       type: filters.spaceType || undefined,
       minCapacity: filters.capacity > 0 ? filters.capacity : undefined,
       checkInDate: filters.date || undefined,
@@ -210,7 +207,7 @@ export default function App() {
   const handleViewSpace = (spaceId: string) => {
     const space = spaces.find(s => s.id === spaceId);
     setSelectedSpace(space);
-    addToRecentlyViewed(spaceId);
+    // addToRecentlyViewed(spaceId);
     startTransition(() => {
       setShowSpaceDetail(true);
     });
@@ -245,7 +242,7 @@ export default function App() {
       spaceLocation: selectedSpace?.address,
       status: 'pending'
     };
-    setReservations([...reservations, newReservation]);
+    // setReservations([...reservations, newReservation]);
     setShowPaymentModal(false);
     setSelectedSpace(null);
     setBookingData(null);
@@ -280,10 +277,10 @@ export default function App() {
     [isHost, mySpaces, spaces]
   );
 
-  // (추천/인기/최근 본 공간 로직 - spaceService에 전용 API가 있으나 일단 유지)
+  // (추천/인기/최근 본 공간 로직)
   const recommendedSpaces = useMemo(() =>
     spaces
-      .filter(space => space.available ?? true)
+      .filter(space => (space.available ?? true))
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
       .slice(0, 6),
     [spaces]
@@ -298,7 +295,7 @@ export default function App() {
   const recentlyViewedSpaces = useMemo(() =>
     recentlyViewed
       .map(id => spaces.find(space => space.id === id))
-      .filter(Boolean)
+      .filter((space): space is Space => !!space) // (타입스크립트 RCE-13416)
       .slice(0, 6),
     [recentlyViewed, spaces]
   );
@@ -500,14 +497,7 @@ export default function App() {
         )}
       </main>
 
-      {/* (삭제) AuthModal */}
-      {/*
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onLogin={handleLogin}
-      />
-      */}
+      {/* AuthModal (삭제) */}
 
       <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <SpaceRegistration

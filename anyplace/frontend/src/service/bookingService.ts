@@ -1,184 +1,65 @@
 import apiClient from '../lib/api';
-import { 
-  Booking, 
-  BookingCreateRequest, 
-  BookingUpdateStatusRequest,
-  BookingAvailabilityRequest,
-  BookingAvailabilityResponse,
-  PaginatedResponse,
-  ApiResponse,
-  BookingStatus
-} from '../lib/types';
+import { User } from '../lib/types'; // (User 타입이 정의된 곳)
 
 /**
- * 예약 관련 API 서비스
+ * 인증 관련 API 서비스 (OIDC 세션 방식)
  */
-const bookingService = {
+const authService = {
   /**
-   * 예약 생성
+   * 현재 로그인한 사용자 정보 조회
+   * (Spring Boot의 /api/me 호출)
    */
-  createBooking: async (data: BookingCreateRequest): Promise<Booking> => {
-    const response = await apiClient.post<ApiResponse<Booking>>('/bookings', data);
-    return response.data.data;
+  getCurrentUser: async (): Promise<User> => {
+    // ★★★ 수정: /auth/me -> /api/me, .data.data -> .data
+    const response = await apiClient.get<User>('/api/me');
+    return response.data;
   },
 
   /**
-   * 예약 상세 조회
+   * OIDC 소셜 로그인 페이지로 이동
    */
-  getBookingById: async (bookingId: string): Promise<Booking> => {
-    const response = await apiClient.get<ApiResponse<Booking>>(`/bookings/${bookingId}`);
-    return response.data.data;
+  redirectToOidcLogin: (provider: 'google' | 'naver' | 'kakao') => {
+    // ★★★ 수정: Spring Security OIDC 엔드포인트로 리디렉션
+    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`;
   },
 
   /**
-   * 내 예약 목록 조회 (사용자)
+   * 로그아웃
    */
-  getMyBookings: async (page = 0, size = 20, status?: BookingStatus): Promise<PaginatedResponse<Booking>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Booking>>>('/bookings/my', {
-      params: {
-        page,
-        size,
-        status,
-      },
-    });
-    return response.data.data;
+  logout: async (): Promise<void> => {
+    // ★★★ 수정: Spring Security 기본 /logout 엔드포인트로 리디렉션
+    window.location.href = 'http://localhost:8080/logout';
   },
 
   /**
-   * 호스트가 받은 예약 목록 (호스트 전용)
+   * 회원 탈퇴 (Spring Boot에 /api/account 엔드포인트가 필요합니다)
    */
-  getHostBookings: async (page = 0, size = 20, status?: BookingStatus): Promise<PaginatedResponse<Booking>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Booking>>>('/bookings/host', {
-      params: {
-        page,
-        size,
-        status,
-      },
-    });
-    return response.data.data;
+  deleteAccount: async (): Promise<void> => {
+    // ★★★ 수정: API 경로 변경
+    await apiClient.delete('/api/account');
+    // (토큰 로직 삭제)
   },
 
   /**
-   * 특정 공간의 예약 목록 (호스트 전용)
+   * 사용자 역할 확인 (App.tsx의 user 객체를 받아와야 함)
    */
-  getSpaceBookings: async (spaceId: string, page = 0, size = 20): Promise<PaginatedResponse<Booking>> => {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Booking>>>(`/bookings/space/${spaceId}`, {
-      params: {
-        page,
-        size,
-      },
-    });
-    return response.data.data;
+  hasRole: (user: User | null, role: 'ROLE_GUEST' | 'ROLE_HOST' | 'ROLE_ADMIN'): boolean => {
+    return user?.role === role;
   },
 
   /**
-   * 예약 상태 변경 (호스트 전용 - 승인/거절)
+   * 호스트 권한 확인 (App.tsx의 user 객체를 받아와야 함)
    */
-  updateBookingStatus: async (bookingId: string, data: BookingUpdateStatusRequest): Promise<Booking> => {
-    const response = await apiClient.patch<ApiResponse<Booking>>(`/bookings/${bookingId}/status`, data);
-    return response.data.data;
+  isHost: (user: User | null): boolean => {
+    return user?.role === 'ROLE_HOST' || user?.role === 'ROLE_ADMIN';
   },
 
   /**
-   * 예약 취소 (사용자)
+   * 관리자 권한 확인 (App.tsx의 user 객체를 받아와야 함)
    */
-  cancelBooking: async (bookingId: string, reason?: string): Promise<Booking> => {
-    const response = await apiClient.patch<ApiResponse<Booking>>(`/bookings/${bookingId}/cancel`, {
-      reason,
-    });
-    return response.data.data;
-  },
-
-  /**
-   * 예약 가능 여부 확인 (동시 예약 방지)
-   */
-  checkAvailability: async (data: BookingAvailabilityRequest): Promise<BookingAvailabilityResponse> => {
-    const response = await apiClient.post<ApiResponse<BookingAvailabilityResponse>>('/bookings/check-availability', data);
-    return response.data.data;
-  },
-
-  /**
-   * 예약 승인 (호스트 전용)
-   */
-  approveBooking: async (bookingId: string): Promise<Booking> => {
-    return bookingService.updateBookingStatus(bookingId, { status: 'CONFIRMED' });
-  },
-
-  /**
-   * 예약 거절 (호스트 전용)
-   */
-  rejectBooking: async (bookingId: string, rejectionReason: string): Promise<Booking> => {
-    return bookingService.updateBookingStatus(bookingId, { 
-      status: 'REJECTED',
-      rejectionReason,
-    });
-  },
-
-  /**
-   * 예약 완료 처리 (자동 또는 수동)
-   */
-  completeBooking: async (bookingId: string): Promise<Booking> => {
-    return bookingService.updateBookingStatus(bookingId, { status: 'COMPLETED' });
-  },
-
-  /**
-   * 다가오는 예약 목록
-   */
-  getUpcomingBookings: async (limit = 5): Promise<Booking[]> => {
-    const response = await apiClient.get<ApiResponse<Booking[]>>('/bookings/upcoming', {
-      params: { limit },
-    });
-    return response.data.data;
-  },
-
-  /**
-   * 최근 예약 목록
-   */
-  getRecentBookings: async (limit = 10): Promise<Booking[]> => {
-    const response = await apiClient.get<ApiResponse<Booking[]>>('/bookings/recent', {
-      params: { limit },
-    });
-    return response.data.data;
-  },
-
-  /**
-   * 예약 통계 조회 (호스트 전용)
-   */
-  getBookingStatistics: async (startDate?: string, endDate?: string): Promise<{
-    totalBookings: number;
-    confirmedBookings: number;
-    pendingBookings: number;
-    cancelledBookings: number;
-    totalRevenue: number;
-  }> => {
-    const response = await apiClient.get<ApiResponse<any>>('/bookings/statistics', {
-      params: {
-        startDate,
-        endDate,
-      },
-    });
-    return response.data.data;
-  },
-
-  /**
-   * 특정 날짜의 예약 가능 시간대 조회
-   */
-  getAvailableTimeSlots: async (spaceId: string, date: string): Promise<{
-    availableSlots: Array<{ startTime: string; endTime: string }>;
-  }> => {
-    const response = await apiClient.get<ApiResponse<any>>(`/bookings/available-slots/${spaceId}`, {
-      params: { date },
-    });
-    return response.data.data;
-  },
-
-  /**
-   * 예약 수정 (날짜/시간 변경) - 향후 구현 예정
-   */
-  updateBooking: async (bookingId: string, data: Partial<BookingCreateRequest>): Promise<Booking> => {
-    const response = await apiClient.put<ApiResponse<Booking>>(`/bookings/${bookingId}`, data);
-    return response.data.data;
+  isAdmin: (user: User | null): boolean => {
+    return user?.role === 'ROLE_ADMIN';
   },
 };
 
-export default bookingService;
+export default authService;
