@@ -20,12 +20,6 @@ export function AuthModal({ isOpen, onClose, onLogin }: AuthModalProps) {
         
         <div className="space-y-6 pt-4">
           <SocialLoginButtons onSocialLogin={onLogin} />
-          
-          <div className="text-center text-xs text-muted-foreground">
-            로그인하시면 anyplace의{' '}
-            <a href="#" className="text-primary underline">이용약관</a> 및{' '}
-            <a href="#" className="text-primary underline">개인정보처리방침</a>에 동의하는 것으로 간주됩니다.
-          </div>
         </div>
       </DialogContent>
     </Dialog>
