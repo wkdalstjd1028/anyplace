@@ -7,22 +7,21 @@ import { Separator } from './ui/separator';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { MapPin, Users, Clock, Star, Wifi, Car, Coffee, Monitor, Shield, Calendar, Heart } from 'lucide-react';
 
-// ★★★ (수정) Space 인터페이스를 Spring DTO와 일치시킵니다.
+// ★★★ (수정) Space 인터페이스에서 available 필드 제거 ★★★
 interface Space {
-  id: string; // Long 타입이지만 React에서는 string으로 처리할 수 있습니다.
-  name: string;          // title -> name
+  id: string;
+  name: string;
   description: string;
-  address: string;       // location -> address
+  address: string;
   capacity: number;
-  pricePerHour: number;  // price -> pricePerHour
+  pricePerHour: number;
   type: string;
-  mainImageUrl: string;  // image -> mainImageUrl
-  rating?: number;       // (있을 수도, 없을 수도 있음)
-  available?: boolean;
+  mainImageUrl: string;
+  rating?: number;
+  // available?: boolean; // ★ (삭제)
   hostId: string;
-  imageUrls?: string[];  // amenities, rules, availableHours 등은 DTO에 없는 필드입니다.
-  facilities?: string[]; // amenities -> facilities
-  // mock data 필드는 제거합니다. (amenities, rules, availableHours, reviews)
+  imageUrls?: string[];
+  facilities?: string[];
 }
 
 interface SpaceDetailProps {
@@ -45,18 +44,13 @@ const amenityIcons: { [key: string]: any } = {
 };
 
 export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited = false, onToggleFavorite }: SpaceDetailProps) {
-  // ★★★ (수정) 가장 중요한 방어 코드: space가 null일 경우 즉시 null 반환
   if (!space) return null;
 
-  // Spring DTO와 일치하는 필드를 사용하도록 변경
-
-  // (Mock 데이터도 DTO 필드에 맞게 조정)
   const mockReviews = [
     { id: '1', user: '김철수', rating: 5, comment: '정말 깨끗하고 시설이 좋습니다.', date: '2024-01-15' },
     { id: '2', user: '이영희', rating: 4, comment: '위치도 좋고 직원분들도 친절하셨습니다.', date: '2024-01-10' }
   ];
 
-  // ★★★ (수정) amenities -> facilities 사용
   const displayFacilities = space.facilities || ['WiFi', '프로젝터', '화이트보드', '주차', '커피'];
   const mockRules = [
     '금연 구역입니다',
@@ -65,17 +59,17 @@ export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited 
     '소음 주의'
   ];
 
-  // ★★★ (수정) 가격 포맷팅 안전 장치
   const formattedPrice = space.pricePerHour ? space.pricePerHour.toLocaleString() : '가격 미정';
+
+  // ★ (추가) available 상태를 명시적으로 true로 가정
+  const isAvailable = true;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          {/* ★ (수정) title -> name */}
           <DialogTitle className="text-2xl">{space.name}</DialogTitle>
           <DialogDescription>
-            {/* ★ (수정) location -> address */}
             {space.type} • {space.address} • 최대 {space.capacity}명
           </DialogDescription>
         </DialogHeader>
@@ -85,7 +79,6 @@ export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <ImageWithFallback
-                // ★ (수정) image -> mainImageUrl
                 src={space.mainImageUrl}
                 alt={space.name}
                 className="w-full h-64 object-cover rounded-lg"
@@ -94,11 +87,12 @@ export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{space.rating || 0}</span> {/* (수정) rating 안전 접근 */}
+                  <span className="font-semibold">{space.rating || 0}</span>
                   <span className="text-muted-foreground">({mockReviews.length}개 리뷰)</span>
                 </div>
-                <Badge variant={space.available ? "default" : "secondary"}>
-                  {space.available ? "예약 가능" : "예약 불가"}
+                {/* ★ (수정) available 대신 isAvailable 사용 */}
+                <Badge variant={isAvailable ? "default" : "secondary"}>
+                  {isAvailable ? "예약 가능" : "예약 불가"}
                 </Badge>
               </div>
             </div>
@@ -108,7 +102,6 @@ export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited 
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      {/* ★ (수정) 가격 포맷팅에 안전 장치 적용 */}
                       <span className="text-3xl font-bold">
                         {formattedPrice}원
                       </span>
@@ -118,7 +111,6 @@ export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited 
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3">
                         <MapPin className="w-5 h-5 text-muted-foreground" />
-                        {/* ★ (수정) location -> address */}
                         <span>{space.address}</span>
                       </div>
                       <div className="flex items-center space-x-3">
@@ -127,12 +119,12 @@ export function SpaceDetail({ space, isOpen, onClose, onBook, user, isFavorited 
                       </div>
                       <div className="flex items-center space-x-3">
                         <Clock className="w-5 h-5 text-muted-foreground" />
-                        {/* ★ (참고) availableHours 필드가 없으므로 하드코딩 유지 */}
                         <span>09:00 - 22:00 이용 가능</span>
                       </div>
                     </div>
 
-                    {space.available && (
+                    {/* ★ (수정) space.available 대신 isAvailable 사용 */}
+                    {isAvailable && (
                       <div className="space-y-3">
                         <div className="flex gap-2">
                           <Button
