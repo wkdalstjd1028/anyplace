@@ -9,9 +9,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+// ★ (수정) OidcUser -> OAuth2User
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser; // (타입 체크용)
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+import java.util.Map; // (추가)
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -21,21 +23,46 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 public class SpaceController {
 
     private final SpaceService spaceService;
-    private final UserRepository userRepository; // (추가) DB에서 User ID를 찾기 위해
+    private final UserRepository userRepository;
 
-    /**
-     * OidcUser로부터 DB의 User ID (Long)를 찾는 헬퍼 메서드
-     */
-    private Long getUserIdFromOidcUser(OidcUser oidcUser) {
-        if (oidcUser == null) {
+    private Long getUserIdFromPrincipal(OAuth2User oauth2User) {
+        if (oauth2User == null) {
             throw new SecurityException("인증되지 않은 사용자입니다.");
         }
-        String provider = oidcUser.getIssuer().toString().contains("google") ? "google" : "unknown"; // (예시)
-        String providerId = oidcUser.getSubject();
+
+        Map<String, Object> attributes = oauth2User.getAttributes();
+        String provider;
+        String providerId;
+
+        if (oauth2User instanceof OidcUser) {
+            // Google (OIDC)
+            OidcUser oidcUser = (OidcUser) oauth2User;
+            provider = getProviderFromIssuer(oidcUser.getIssuer().toString());
+            providerId = oidcUser.getSubject();
+        } else {
+            // Kakao, Naver (OAuth2)
+            if (attributes.containsKey("kakao_account")) {
+                provider = "kakao";
+                providerId = String.valueOf(attributes.get("id"));
+            } else if (attributes.containsKey("response")) {
+                provider = "naver";
+                providerId = (String) ((Map<String, Object>) attributes.get("response")).get("id");
+            } else {
+                throw new RuntimeException("알 수 없는 OAuth2 provider입니다.");
+            }
+        }
 
         return userRepository.findByProviderAndProviderId(provider, providerId)
-                .orElseThrow(() -> new RuntimeException("DB에서 사용자를 찾을 수 없습니다."))
+                .orElseThrow(() -> new RuntimeException("DB에서 사용자를 찾을 수 없습니다. provider=" + provider + ", providerId=" + providerId))
                 .getId();
+    }
+
+    // (Issuer 헬퍼)
+    private String getProviderFromIssuer(String issuer) {
+        if (issuer.contains("google")) {
+            return "google";
+        }
+        return "google"; // (OIDC는 현재 google만 가정)
     }
 
     @GetMapping
@@ -47,10 +74,10 @@ public class SpaceController {
 
     @PostMapping
     public SpaceDTO createSpace(@Valid @RequestBody SpaceDTO dto,
-                                @AuthenticationPrincipal OidcUser oidcUser // (수정) Long -> OidcUser
+                                @AuthenticationPrincipal OAuth2User oauth2User // ★ (수정) OidcUser -> OAuth2User
     ) {
-        // (추가) OidcUser로부터 실제 DB User ID (Long) 조회
-        Long currentUserId = getUserIdFromOidcUser(oidcUser);
+        // ★ (수정) 헬퍼 메서드 호출
+        Long currentUserId = getUserIdFromPrincipal(oauth2User);
 
         return spaceService.saveSpace(dto, currentUserId);
     }
@@ -62,12 +89,11 @@ public class SpaceController {
 
     @DeleteMapping("/{id}")
     public void deleteSpace(@PathVariable Long id,
-                            @AuthenticationPrincipal OidcUser oidcUser // (수정) Long -> OidcUser
+                            @AuthenticationPrincipal OAuth2User oauth2User // ★ (수정) OidcUser -> OAuth2User
     ) {
-        // (추가) OidcUser로부터 실제 DB User ID (Long) 조회
-        Long currentUserId = getUserIdFromOidcUser(oidcUser);
+        // ★ (수정) 헬퍼 메서드 호출
+        Long currentUserId = getUserIdFromPrincipal(oauth2User);
 
         spaceService.deleteSpace(id, currentUserId);
     }
-
 }

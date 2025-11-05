@@ -154,7 +154,19 @@ export default function App() {
   }, [checkLoginStatus]);
 
 
-  const handleSpaceRegistration = async (spaceData: any) => { /* ... */ };
+  // ★★★ (수정) 공간 등록 핸들러 ★★★
+  const handleSpaceRegistration = async (spaceData: any) => {
+    // (수정) try/catch를 SpaceRegistration.tsx로 이동시킵니다.
+    // 이 함수는 API 호출과 UI 갱신만 책임집니다.
+
+    // 1. API 호출 (DB 저장)
+    const newSpace = await spaceService.createSpace(spaceData);
+
+    // 2. UI 갱신 (화면에 새 공간 추가)
+    setSpaces(prev => [newSpace, ...prev]);
+  };
+
+  // (나머지 핸들러들 ...)
   const handleDeleteSpace = async (spaceId: string) => { /* ... */ };
   const handleClearFilters = useCallback(() => { /* ... */ }, [fetchSpaces, pagination.size]);
   const handleShowAllSpaces = () => { /* ... */ };
@@ -230,31 +242,25 @@ export default function App() {
               </div>
             )}
 
-            {/* ★★★ (수정) Search Results Alert: 아이콘 추가 ★★★ */}
+            {/* (Search Results Alert) */}
             {isSearched && !showAllMode && !isHost && (
-              // (수정) Tailwind 클래스 및 아이콘 추가
-              <div className="mb-6 p-4 rounded-lg bg-gray-100 border" id="search-results-section"> {/* (수정) bg-primary/10 -> bg-gray-100 */}
+              <div className="mb-6 p-4 rounded-lg bg-gray-100 border" id="search-results-section">
                 <div className="flex items-center justify-between">
-
-                  {/* 아이콘과 텍스트를 flex로 묶음 */}
-                  <div className="flex items-center gap-4"> {/* (수정) gap-3 -> gap-4 */}
-                    {/* 아이콘 (이미지 참고) */}
-                    <div className="flex-shrink-0 p-3 rounded-full bg-white border shadow-sm"> {/* (수정) 스타일 변경 */}
-                      <Grid className="w-5 h-5 text-gray-700" /> {/* (수정) 색상 변경 */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0 p-3 rounded-full bg-white border shadow-sm">
+                      <Grid className="w-5 h-5 text-gray-700" />
                     </div>
-                    {/* 텍스트 div */}
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">검색 결과</h3> {/* (수정) 스타일 변경 */}
+                      <h3 className="text-lg font-semibold text-gray-900">검색 결과</h3>
                       <p className="text-sm text-muted-foreground">
                         조건에 맞는 <span className="font-semibold text-primary">{pagination.totalElements}개</span>의 공간을 찾았습니다
                       </p>
                     </div>
                   </div>
-
                   <Button
                     variant="outline"
                     onClick={handleShowAllSpaces}
-                    className="bg-white" // (수정) 버튼 스타일
+                    className="bg-white"
                   >
                     전체 보기 ({pagination.totalElements}개)
                   </Button>
@@ -262,7 +268,7 @@ export default function App() {
               </div>
             )}
 
-            {/* (Spaces Section) */}
+            {/* (Spaces Section - 복원됨) */}
             <div className="p-6 rounded-xl border bg-card/50" id="spaces-section">
                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div>

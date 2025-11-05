@@ -1,13 +1,11 @@
 package com.project.anyplace.space.specification;
 
+import com.project.anyplace.reservation.entity.Reservation;
 import com.project.anyplace.space.dto.SpaceSearchRequest;
 import com.project.anyplace.space.entity.Space;
-
-import com.project.anyplace.reservation.entity.Reservation;
-
 import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root; // (추가)
-import jakarta.persistence.criteria.Subquery; // (추가)
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
@@ -50,6 +48,10 @@ public class SpaceSpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("pricePerHour"), request.getMaxPrice()));
             }
 
+
+            // ★ (2. 임시 주석 처리)
+            // (나중에 Reservation 엔티티를 만든 후 이 주석을 해제해야 합니다.)
+            /*
             if (request.getCheckInDate() != null && request.getCheckOutDate() != null) {
 
                 Subquery<Long> subquery = query.subquery(Long.class);
@@ -67,6 +69,8 @@ public class SpaceSpecification {
 
                 predicates.add(cb.not(root.get("id").in(subquery)));
             }
+            */
+
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
