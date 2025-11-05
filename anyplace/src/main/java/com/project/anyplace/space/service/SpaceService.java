@@ -36,7 +36,6 @@ public class SpaceService {
         return spacePage.map(this::entityToDto);
     }
 
-    // ★ (추가) "내 공간" 조회 서비스
     @Transactional(readOnly = true)
     public Page<SpaceDTO> findSpacesByHostId(Long hostId, Pageable pageable) {
         Page<Space> spacePage = spaceRepository.findByHostId(hostId, pageable);
@@ -72,7 +71,7 @@ public class SpaceService {
     private SpaceDTO entityToDto(Space space) {
         return SpaceDTO.builder()
                 .id(space.getId())
-                .hostId(space.getHostId()) // (추가)
+                .hostId(space.getHostId())
                 .name(space.getName())
                 .type(space.getType())
                 .description(space.getDescription())
@@ -87,8 +86,8 @@ public class SpaceService {
 
     private Space dtoToEntity(SpaceDTO dto) {
         return Space.builder()
-                .id(dto.getId()) // (추가) 업데이트 시 id가 필요합니다.
-                .hostId(dto.getHostId()) // (추가)
+                .id(dto.getId())
+                .hostId(dto.getHostId())
                 .name(dto.getName())
                 .type(dto.getType())
                 .description(dto.getDescription())

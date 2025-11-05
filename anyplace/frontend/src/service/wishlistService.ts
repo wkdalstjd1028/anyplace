@@ -1,4 +1,3 @@
-// src/service/wishlistService.ts
 import apiClient from '../lib/api';
 import { 
   Wishlist,

@@ -1,5 +1,3 @@
-// src/components/HostApplicationModal.tsx
-
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';

@@ -39,7 +39,6 @@ public class Space {
     @Column(nullable = false)
     private int pricePerHour;
 
-    // ★★★ (수정) 컬럼 길이를 255에서 512로 늘립니다. ★★★
     @Column(length = 512)
     private String mainImageUrl;
 

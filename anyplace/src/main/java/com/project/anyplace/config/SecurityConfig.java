@@ -13,7 +13,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher; // (import 문은 그대로 유지)
 
 @Configuration
 @EnableWebSecurity
@@ -28,8 +27,6 @@ public class SecurityConfig {
         http
                 .cors(Customizer.withDefaults())
 
-                // ★★★ (2. CSRF 보호 비활성화 - 404 오류의 근본 원인) ★★★
-                // (최신 Spring Security 6+ 방식)
                 .csrf(AbstractHttpConfigurer::disable)
 
                 .authorizeHttpRequests(authorize -> authorize
@@ -50,13 +47,11 @@ public class SecurityConfig {
                         )
                 )
 
-                // ★★★ (3. 로그아웃 설정 수정) ★★★
                 .logout(logout -> logout
-                        // .logoutRequestMatcher(...) (삭제)
-                        .logoutUrl("/logout") // React가 호출할 로그아웃 주소
-                        .logoutSuccessUrl("http://localhost:3000") // 성공 시 React 홈으로
-                        .deleteCookies("JSESSIONID") // 세션 쿠키 삭제
-                        .invalidateHttpSession(true) // 세션 무효화
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("http://localhost:3000")
+                        .deleteCookies("JSESSIONID")
+                        .invalidateHttpSession(true)
                 );
 
         return http.build();

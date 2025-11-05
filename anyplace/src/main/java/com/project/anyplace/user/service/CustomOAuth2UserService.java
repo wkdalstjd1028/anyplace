@@ -31,7 +31,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         String provider = userRequest.getClientRegistration().getRegistrationId();
         Map<String, Object> attributes = oAuth2User.getAttributes();
 
-        // 1. providerId, email, name을 수동으로 파싱합니다.
         String providerId;
         String email;
         String name;
@@ -44,7 +43,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             email = (String) kakaoAccount.get("email");
             name = (String) profile.get("nickname");
 
-            // (이메일 권한이 없는 경우 임시 이메일 생성)
             if (email == null) {
                 email = providerId + "@kakao.com";
             }
@@ -55,14 +53,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             email = (String) responseMap.get("email");
             name = (String) responseMap.get("name");
         } else {
-            // 다른 OAuth2 provider (ex: Github...)
             throw new OAuth2AuthenticationException("지원하지 않는 OAuth2 provider입니다.");
         }
 
-        // 2. DB에 사용자를 저장하거나 업데이트합니다.
         User user = saveOrUpdate(provider, providerId, email, name);
 
-        // 3. Spring Security가 사용할 인증 객체를 반환합니다.
         return new DefaultOAuth2User(
                 Collections.singleton(new SimpleGrantedAuthority(user.getRoleKey())),
                 attributes,
@@ -73,13 +68,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private User saveOrUpdate(String provider, String providerId, String email, String name) {
         User user = userRepository.findByProviderAndProviderId(provider, providerId)
                 .map(entity -> {
-                    // (사용자가 이미 존재할 경우) 이름, 이메일 업데이트
                     entity.setName(Optional.ofNullable(name).orElse(entity.getName()));
                     entity.setEmail(Optional.ofNullable(email).orElse(entity.getEmail()));
                     return entity;
                 })
                 .orElseGet(() -> {
-                    // (신규 사용자일 경우) DB에 새로 저장
                     return User.builder()
                             .email(Optional.ofNullable(email).orElse(providerId + "@" + provider))
                             .name(Optional.ofNullable(name).orElse("사용자"))

@@ -33,15 +33,12 @@ public class UserController {
         String provider;
         String providerId;
 
-        // ★ (수정) OIDC와 OAuth2를 모두 처리
         if (oauth2User instanceof OidcUser) {
             // Google (OIDC)
             OidcUser oidcUser = (OidcUser) oauth2User;
             provider = getProviderFromIssuer(oidcUser.getIssuer().toString());
             providerId = oidcUser.getSubject();
         } else {
-            // Kakao, Naver (OAuth2)
-            // (참고: attributes.get("provider")가 있다면 그것을 사용하는 것이 더 안전합니다)
             if (attributes.containsKey("kakao_account")) {
                 provider = "kakao";
                 providerId = String.valueOf(attributes.get("id"));
@@ -58,12 +55,10 @@ public class UserController {
                 .getId();
     }
 
-    // (Issuer 헬퍼 - 수정됨)
     private String getProviderFromIssuer(String issuer) {
         if (issuer.contains("google")) {
             return "google";
         }
-        // (OAuth2는 issuer가 없으므로 이 메서드는 OIDC(Google) 전용입니다)
         return "google";
     }
 
@@ -79,11 +74,11 @@ public class UserController {
 
     @PostMapping("/api/user/upgrade-to-host")
     public ResponseEntity<Void> upgradeToHost(
-            @AuthenticationPrincipal OAuth2User oauth2User, // (OAuth2User로 수정됨)
-            @Valid @RequestBody UserDTO.HostUpgradeRequest request //
+            @AuthenticationPrincipal OAuth2User oauth2User,
+            @Valid @RequestBody UserDTO.HostUpgradeRequest request
     ) {
         Long userId = getUserIdFromPrincipal(oauth2User);
-        userService.upgradeToHost(userId, request); //
+        userService.upgradeToHost(userId, request);
         return ResponseEntity.ok().build();
     }
 }

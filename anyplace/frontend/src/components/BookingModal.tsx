@@ -27,7 +27,6 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
   const [endTime, setEndTime] = useState<string>('');
   const [headCount, setHeadCount] = useState<string>('');
 
-  // Don't render if no space data
   if (!space) {
     return null;
   }

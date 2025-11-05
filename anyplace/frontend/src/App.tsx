@@ -14,7 +14,6 @@ import spaceService from './service/spaceService';
 import authService from './service/authService';
 import { Space, SpaceSearchParams, User } from '../lib/types';
 
-// Lazy load heavy components
 const SpaceRegistration = React.lazy(() => import('./components/SpaceRegistration').then(m => ({ default: m.SpaceRegistration })));
 const SpaceDetail = React.lazy(() => import('./components/SpaceDetail').then(m => ({ default: m.SpaceDetail })));
 const BookingModal = React.lazy(() => import('./components/BookingModal').then(m => ({ default: m.BookingModal })));
@@ -24,13 +23,11 @@ const ReservationDashboard = React.lazy(() => import('./components/ReservationDa
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
 
-  // (isHost 로직 - 정상)
   const isHost = useMemo(() => {
     if (!user) return false;
     return user.role === 'ROLE_HOST' || user.role === 'ROLE_ADMIN';
   }, [user]);
 
-  // (모달 상태)
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showHostApplicationModal, setShowHostApplicationModal] = useState(false);
   const [isHostLoading, setIsHostLoading] = useState(false);
@@ -41,7 +38,6 @@ export default function App() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [bookingData, setBookingData] = useState(null);
 
-  // (API 연동 상태)
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearched, setIsSearched] = useState(false);
@@ -59,12 +55,10 @@ export default function App() {
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
 
-  // (Auth 핸들러)
   const handleShowLoginModal = useCallback(() => { setShowAuthModal(true); }, []);
   const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => { authService.redirectToOidcLogin(provider); }, []);
   const handleLogout = useCallback(() => { authService.logout(); }, []);
 
-  // (로그인 상태 확인)
   const checkLoginStatus = useCallback(async () => {
     try {
       const userData = await authService.getCurrentUser();
@@ -79,7 +73,6 @@ export default function App() {
     checkLoginStatus();
   }, [checkLoginStatus]);
 
-  // (공간 데이터 불러오기 - "전체" 또는 "검색")
   const fetchSpaces = useCallback(async (params: SpaceSearchParams) => {
     setIsLoading(true);
     const searchParamCount = Object.values(params).filter(v => v !== undefined && v !== '' && v !== 0).length;
@@ -106,12 +99,10 @@ export default function App() {
     }
   }, []);
 
-  // ★ (수정) "내 공간" 불러오기
   const fetchMySpaces = useCallback(async (page = 0) => {
     setIsLoading(true);
     setIsSearched(false);
     try {
-      // ★ (수정) spaceService.getMySpaces에 page와 size만 전달합니다.
       const response = await spaceService.getMySpaces(page, pagination.size);
       if (page === 0) {
         setSpaces(response.content);
@@ -126,16 +117,13 @@ export default function App() {
       });
     } catch (err) {
       console.error("API Error fetching my spaces:", err);
-      // ★ "내 공간 정보를 불러오는 데 실패했습니다."가 여기서 발생합니다.
       toast.error('내 공간 정보를 불러오는 데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.size]); // (의존성에서 pagination.size만 남김)
+  }, [pagination.size]);
 
-  // (컴포넌트 마운트 시)
   useEffect(() => {
-    // (isHost 값이 확정된 *후에* 기본 데이터를 로드)
   }, []);
 
   useEffect(() => {
@@ -158,7 +146,6 @@ export default function App() {
   useEffect(() => { localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces)); }, [favoriteSpaces]);
   useEffect(() => { localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed)); }, [recentlyViewed]);
 
-  // ("호스트 되기" 핸들러)
   const handleToggleHostMode = useCallback(() => {
     if (isHost) {
       toast.info("이미 호스트 권한을 가지고 있습니다.");
@@ -167,7 +154,6 @@ export default function App() {
     setShowHostApplicationModal(true);
   }, [isHost]);
 
-  // ("호스트 신청" 모달 Submit 시)
   const handleHostApplicationSubmit = useCallback(async (data: { businessLicenseNumber: string; description: string }) => {
     setIsHostLoading(true);
     try {
@@ -191,14 +177,12 @@ export default function App() {
 
   const handleDeleteSpace = async (spaceId: string) => { /* ... */ };
 
-  // (필터 초기화 및 전체 공간 보기)
   const handleClearFilters = useCallback(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
     fetchSpaces(initialParams);
     setCurrentFilters(initialParams);
   }, [fetchSpaces, pagination.size]);
 
-  // ("검색" 핸들러)
   const handleQuickFilter = useCallback((filters: {
     date: string;
     province: string;
@@ -209,7 +193,7 @@ export default function App() {
     const params: SpaceSearchParams = {
       page: 0,
       size: pagination.size,
-      sort: 'createdAt,desc', // ★ (수정) 검색 시에는 정렬 파라미터를 보냅니다.
+      sort: 'createdAt,desc',
       city: filters.province || undefined,
       district: filters.district || undefined,
       type: filters.spaceType || undefined,
@@ -228,7 +212,6 @@ export default function App() {
     }, 100);
   }, [fetchSpaces, pagination.size]);
 
-  // (핸들러 ...)
   const handleViewSpace = (spaceId: string) => { /* ... */ };
   const handleBookSpace = (spaceId: string) => { /* ... */ };
   const handleConfirmBooking = (bookingInfo: any) => { /* ... */ };
@@ -236,7 +219,6 @@ export default function App() {
   const handleUpdateReservation = (reservationId: string, status: string) => { /* ... */ };
   const handleCancelReservation = (reservationId: string) => { /* ... */ };
 
-  // ("내 공간" / "찜한 공간" 등 네비게이션)
   const handleNavigate = (view: string) => {
     setCurrentView(view);
 
@@ -249,11 +231,8 @@ export default function App() {
     }
   };
 
-  // (로고 클릭 시)
   const handleResetToHome = useCallback(() => {
     setCurrentView('home');
-    // ... (모달 닫기)
-
     if (isHost) {
       fetchMySpaces(0);
     } else {
@@ -271,7 +250,7 @@ export default function App() {
   const handleLoadMore = () => {
     if (pagination.page < pagination.totalPages - 1) {
       const nextParams = { ...currentFilters, page: pagination.page + 1 };
-      if (isHost && currentView === 'home' && !isSearched) { // ★ (수정) 호스트이고, 홈 뷰이고, 검색 중이 아닐 때
+      if (isHost && currentView === 'home' && !isSearched) {
         fetchMySpaces(pagination.page + 1);
       } else {
         fetchSpaces(nextParams);

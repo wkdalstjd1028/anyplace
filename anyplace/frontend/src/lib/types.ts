@@ -1,7 +1,3 @@
-// ============================================
-// 공통 타입
-// ============================================
-
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -16,10 +12,6 @@ export interface PaginatedResponse<T> {
   size: number;
   number: number;
 }
-
-// ============================================
-// 사용자 관련 타입
-// ============================================
 
 export interface User {
   id: string;
@@ -53,9 +45,6 @@ export interface TokenRefreshResponse {
   refreshToken: string;
 }
 
-// ============================================
-// 공간 관련 타입
-// ============================================
 
 export type SpaceType = 'PARTY_ROOM' | 'MEETING_ROOM' | 'RECORDING_STUDIO' | 'PRACTICE_ROOM' | 'SEMINAR_ROOM' | 'OTHER';
 
@@ -67,16 +56,16 @@ export interface Space {
   description: string;
   type: SpaceType;
   address: string;
-  city: string; // 시/도
-  district: string; // 구/군/시
+  city: string;
+  district: string;
   detailAddress: string;
   maxCapacity: number;
   pricePerHour: number;
   images: string[];
   amenities: string[];
   rules: string[];
-  availableFrom: string; // 시작 가능 시간 (HH:mm)
-  availableTo: string; // 종료 시간 (HH:mm)
+  availableFrom: string;
+  availableTo: string;
   rating: number;
   reviewCount: number;
   isActive: boolean;
@@ -110,19 +99,16 @@ export interface SpaceSearchParams {
   city?: string;
   district?: string;
   type?: SpaceType;
-  checkInDate?: string; // yyyy-MM-dd
-  checkOutDate?: string; // yyyy-MM-dd
+  checkInDate?: string;
+  checkOutDate?: string;
   minCapacity?: number;
   minPrice?: number;
   maxPrice?: number;
   page?: number;
   size?: number;
-  sort?: string; // 예: "price,asc" or "rating,desc"
+  sort?: string;
 }
 
-// ============================================
-// 예약 관련 타입
-// ============================================
 
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
 
@@ -137,10 +123,10 @@ export interface Booking {
   spaceAddress: string;
   hostId: string;
   hostName: string;
-  checkInDate: string; // yyyy-MM-dd
-  checkOutDate: string; // yyyy-MM-dd
-  checkInTime: string; // HH:mm
-  checkOutTime: string; // HH:mm
+  checkInDate: string;
+  checkOutDate: string;
+  checkInTime: string;
+  checkOutTime: string;
   guests: number;
   totalPrice: number;
   status: BookingStatus;
@@ -178,9 +164,6 @@ export interface BookingAvailabilityResponse {
   message?: string;
 }
 
-// ============================================
-// 결제 관련 타입
-// ============================================
 
 export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
 export type PaymentMethod = 'CARD' | 'VIRTUAL_ACCOUNT' | 'TRANSFER' | 'MOBILE';
@@ -192,8 +175,8 @@ export interface Payment {
   amount: number;
   method: PaymentMethod;
   status: PaymentStatus;
-  provider: 'PORTONE' | 'TOSSPAYMENTS'; // 결제 PG사
-  transactionId?: string; // PG사 거래 ID
+  provider: 'PORTONE' | 'TOSSPAYMENTS';
+  transactionId?: string;
   approvedAt?: string;
   cancelledAt?: string;
   refundedAt?: string;
@@ -221,9 +204,6 @@ export interface PaymentCancelRequest {
   refundAmount?: number;
 }
 
-// ============================================
-// 리뷰 관련 타입
-// ============================================
 
 export interface Review {
   id: string;
@@ -252,9 +232,6 @@ export interface ReviewReplyRequest {
   reply: string;
 }
 
-// ============================================
-// 위시리스트 관련 타입
-// ============================================
 
 export interface Wishlist {
   id: string;
@@ -264,9 +241,6 @@ export interface Wishlist {
   createdAt: string;
 }
 
-// ============================================
-// 에러 타입
-// ============================================
 
 export interface ApiError {
   status: number;

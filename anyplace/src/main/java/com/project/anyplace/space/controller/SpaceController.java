@@ -35,12 +35,10 @@ public class SpaceController {
         String providerId;
 
         if (oauth2User instanceof OidcUser) {
-            // Google (OIDC)
             OidcUser oidcUser = (OidcUser) oauth2User;
             provider = getProviderFromIssuer(oidcUser.getIssuer().toString());
             providerId = oidcUser.getSubject();
         } else {
-            // Kakao, Naver (OAuth2)
             if (attributes.containsKey("kakao_account")) {
                 provider = "kakao";
                 providerId = String.valueOf(attributes.get("id"));
@@ -57,12 +55,11 @@ public class SpaceController {
                 .getId();
     }
 
-    // (Issuer 헬퍼)
     private String getProviderFromIssuer(String issuer) {
         if (issuer.contains("google")) {
             return "google";
         }
-        return "google"; // (OIDC는 현재 google만 가정)
+        return "google";
     }
 
     @GetMapping
@@ -72,11 +69,9 @@ public class SpaceController {
         return spaceService.searchSpaces(request, pageable);
     }
 
-    // ★ (추가) "내 공간" API
     @GetMapping("/my")
     public Page<SpaceDTO> getMySpaces(
             @AuthenticationPrincipal OAuth2User oauth2User,
-            // ★ (수정) React가 sort를 보내지 않으므로, 여기서 기본 정렬을 적용합니다.
             @PageableDefault(size = 20, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC)
             Pageable pageable) {
 
@@ -86,9 +81,8 @@ public class SpaceController {
 
     @PostMapping
     public SpaceDTO createSpace(@Valid @RequestBody SpaceDTO dto,
-                                @AuthenticationPrincipal OAuth2User oauth2User // ★ (수정) OidcUser -> OAuth2User
+                                @AuthenticationPrincipal OAuth2User oauth2User
     ) {
-        // ★ (수정) 헬퍼 메서드 호출
         Long currentUserId = getUserIdFromPrincipal(oauth2User);
 
         return spaceService.saveSpace(dto, currentUserId);
@@ -101,9 +95,8 @@ public class SpaceController {
 
     @DeleteMapping("/{id}")
     public void deleteSpace(@PathVariable Long id,
-                            @AuthenticationPrincipal OAuth2User oauth2User // ★ (수정) OidcUser -> OAuth2User
+                            @AuthenticationPrincipal OAuth2User oauth2User
     ) {
-        // ★ (수정) 헬퍼 메서드 호출
         Long currentUserId = getUserIdFromPrincipal(oauth2User);
 
         spaceService.deleteSpace(id, currentUserId);

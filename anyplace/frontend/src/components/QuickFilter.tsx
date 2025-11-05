@@ -10,8 +10,8 @@ import { CalendarIcon, MapPin, Users, Building2, Search } from 'lucide-react';
 interface QuickFilterProps {
   onSearch: (filters: {
     date: string;
-    province: string; // "시/도"
-    district: string; // "구/시"
+    province: string;
+    district: string;
     capacity: number;
     spaceType: string;
   }) => void;
@@ -208,13 +208,11 @@ export const QuickFilter = React.memo(function QuickFilter({ onSearch }: QuickFi
   const [capacity, setCapacity] = useState('');
   const [spaceType, setSpaceType] = useState('all');
 
-  // Reset district when province changes
     useEffect(() => {
       setSelectedDistrict('all');
     }, [selectedProvince]);
 
     const handleSearch = useCallback(() => {
-      // ★ (2. 수정) province와 district를 분리해서 전달
       onSearch({
         date: selectedDate ? selectedDate.toISOString().split('T')[0] : '',
         province: selectedProvince === 'all' ? '' : selectedProvince,

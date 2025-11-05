@@ -1,4 +1,3 @@
-// src/service/paymentService.ts
 import apiClient from '../lib/api';
 import { 
   Payment, 
@@ -71,7 +70,6 @@ const paymentService = {
     return response.data;
   },
   
-  // (아래는 API 호출이 아니므로 수정 불필요)
   initializePortOnePayment: (bookingId: string, amount: number): any => { /* ... */ },
   initializeTossPayment: (bookingId: string, amount: number): any => { /* ... */ },
 

@@ -6,7 +6,6 @@ interface SocialLoginButtonsProps {
 }
 
 export function SocialLoginButtons({ onSocialLogin }: SocialLoginButtonsProps) {
-  // Test host accounts for different spaces
   const testHosts = {
     'Google': {
       id: '1',
@@ -32,15 +31,13 @@ export function SocialLoginButtons({ onSocialLogin }: SocialLoginButtonsProps) {
   };
 
   const handleSocialLogin = (provider: string) => {
-    // Mock social login - in real app, this would redirect to OAuth provider
     toast.info(`${provider} 로그인을 진행합니다...`);
     
-    // Simulate OAuth response
     setTimeout(() => {
       const hostData = testHosts[provider as keyof typeof testHosts];
       const mockUserData = {
         ...hostData,
-        jwt: `mock-jwt-token-${Date.now()}` // Mock JWT token
+        jwt: `mock-jwt-token-${Date.now()}`
       };
       
       onSocialLogin(mockUserData);

@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional; // Optional 임포트
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,9 +29,8 @@ public class CustomOidcUserService extends OidcUserService {
         OidcUser oidcUser = super.loadUser(userRequest);
         Map<String, Object> attributes = oidcUser.getAttributes();
 
-        // (Google 전용 로직)
         String provider = userRequest.getClientRegistration().getRegistrationId();
-        String providerId = oidcUser.getSubject(); // OIDC 표준 ID
+        String providerId = oidcUser.getSubject();
         String email = oidcUser.getEmail();
         String name = oidcUser.getFullName();
 
@@ -54,7 +53,6 @@ public class CustomOidcUserService extends OidcUserService {
         );
     }
 
-    // (OIDC 전용 saveOrUpdate - Google만 처리)
     private User saveOrUpdate(String provider, String providerId, String email, String name) {
         User user = userRepository.findByProviderAndProviderId(provider, providerId)
                 .map(entity -> {

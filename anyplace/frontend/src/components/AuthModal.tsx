@@ -1,18 +1,13 @@
-// src/components/AuthModal.tsx
-
 import React from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-// (참고: 구글/카카오/네이버 로고 SVG나 아이콘 컴포넌트가 필요할 수 있습니다)
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // 'google', 'kakao', 'naver' 중 하나를 받는 함수
   onLogin: (provider: 'google' | 'kakao' | 'naver') => void;
 }
 
-// (임시) 아이콘 컴포넌트
 const GoogleIcon = () => <span style={{ marginRight: '8px', fontSize: '1.2em' }}>G</span>;
 const KakaoIcon = () => <span style={{ marginRight: '8px', fontSize: '1.2em' }}>K</span>;
 const NaverIcon = () => <span style={{ marginRight: '8px', fontSize: '1.2em' }}>N</span>;
