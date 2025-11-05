@@ -10,7 +10,8 @@ import { CalendarIcon, MapPin, Users, Building2, Search } from 'lucide-react';
 interface QuickFilterProps {
   onSearch: (filters: {
     date: string;
-    location: string;
+    province: string; // "시/도"
+    district: string; // "구/시"
     capacity: number;
     spaceType: string;
   }) => void;
@@ -208,164 +209,162 @@ export const QuickFilter = React.memo(function QuickFilter({ onSearch }: QuickFi
   const [spaceType, setSpaceType] = useState('all');
 
   // Reset district when province changes
-  useEffect(() => {
-    setSelectedDistrict('all');
-  }, [selectedProvince]);
+    useEffect(() => {
+      setSelectedDistrict('all');
+    }, [selectedProvince]);
 
-  const handleSearch = useCallback(() => {
-    const location = selectedDistrict === 'all' ? 
-      (selectedProvince === 'all' ? '' : selectedProvince) : 
-      selectedDistrict;
-      
-    onSearch({
-      date: selectedDate ? selectedDate.toISOString().split('T')[0] : '',
-      location,
-      capacity: capacity ? parseInt(capacity) : 0,
-      spaceType: spaceType === 'all' ? '' : spaceType
-    });
-  }, [selectedDate, selectedDistrict, selectedProvince, capacity, spaceType, onSearch]);
+    const handleSearch = useCallback(() => {
+      // ★ (2. 수정) province와 district를 분리해서 전달
+      onSearch({
+        date: selectedDate ? selectedDate.toISOString().split('T')[0] : '',
+        province: selectedProvince === 'all' ? '' : selectedProvince,
+        district: selectedDistrict === 'all' ? '' : selectedDistrict,
+        capacity: capacity ? parseInt(capacity) : 0,
+        spaceType: spaceType === 'all' ? '' : spaceType
+      });
+    }, [selectedDate, selectedDistrict, selectedProvince, capacity, spaceType, onSearch]);
 
-  const handleReset = useCallback(() => {
-    setSelectedDate(undefined);
-    setSelectedProvince('all');
-    setSelectedDistrict('all');
-    setCapacity('');
-    setSpaceType('all');
-  }, []);
+    const handleReset = useCallback(() => {
+      setSelectedDate(undefined);
+      setSelectedProvince('all');
+      setSelectedDistrict('all');
+      setCapacity('');
+      setSpaceType('all');
+    }, []);
 
-  const availableDistricts = useMemo(() => 
-    selectedProvince === 'all' ? [] : (districts[selectedProvince as keyof typeof districts] || []), 
-    [selectedProvince]
-  );
+    const availableDistricts = useMemo(() =>
+      selectedProvince === 'all' ? [] : (districts[selectedProvince as keyof typeof districts] || []),
+      [selectedProvince]
+    );
 
-  return (
-    <Card className="w-full shadow-lg">
-      <CardContent className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
-          {/* Date Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <CalendarIcon className="w-4 h-4" />
-              날짜
-            </label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal h-11"
-                >
-                  {selectedDate ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일` : '날짜 선택'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < new Date()}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+    return (
+      <Card className="w-full shadow-lg">
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+            {/* Date Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4" />
+                날짜
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal h-11"
+                  >
+                    {selectedDate ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일` : '날짜 선택'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Province Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                시/도
+              </label>
+              <Select value={selectedProvince} onValueChange={setSelectedProvince}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="시/도 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {provinces.map((province) => (
+                    <SelectItem key={province.value} value={province.value}>
+                      {province.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* District Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                구/시
+              </label>
+              <Select
+                value={selectedDistrict}
+                onValueChange={setSelectedDistrict}
+                disabled={selectedProvince === 'all'}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder={selectedProvince === 'all' ? '시/도를 먼저 선택하세요' : '구/시 선택'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 구/시</SelectItem>
+                  {availableDistricts.map((district) => (
+                    <SelectItem key={district.value} value={district.value}>
+                      {district.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Capacity Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                인원 수
+              </label>
+              <Input
+                type="number"
+                placeholder="인원 수"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                min="1"
+                className="h-11"
+              />
+            </div>
+
+            {/* Space Type Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                공간 종류
+              </label>
+              <Select value={spaceType} onValueChange={setSpaceType}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="공간 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {spaceTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Search Buttons */}
+            <div className="flex gap-2">
+              <Button onClick={handleSearch} className="flex-1 h-11">
+                <Search className="w-4 h-4 mr-2" />
+                검색
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleReset}
+                className="h-11 px-3"
+              >
+                초기화
+              </Button>
+            </div>
           </div>
-
-          {/* Province Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              시/도
-            </label>
-            <Select value={selectedProvince} onValueChange={setSelectedProvince}>
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder="시/도 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {provinces.map((province) => (
-                  <SelectItem key={province.value} value={province.value}>
-                    {province.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* District Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              구/시
-            </label>
-            <Select 
-              value={selectedDistrict} 
-              onValueChange={setSelectedDistrict}
-              disabled={selectedProvince === 'all'}
-            >
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder={selectedProvince === 'all' ? '시/도를 먼저 선택하세요' : '구/시 선택'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체 구/시</SelectItem>
-                {availableDistricts.map((district) => (
-                  <SelectItem key={district.value} value={district.value}>
-                    {district.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Capacity Input */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              인원 수
-            </label>
-            <Input
-              type="number"
-              placeholder="인원 수"
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              min="1"
-              className="h-11"
-            />
-          </div>
-
-          {/* Space Type Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <Building2 className="w-4 h-4" />
-              공간 종류
-            </label>
-            <Select value={spaceType} onValueChange={setSpaceType}>
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder="공간 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {spaceTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Search Buttons */}
-          <div className="flex gap-2">
-            <Button onClick={handleSearch} className="flex-1 h-11">
-              <Search className="w-4 h-4 mr-2" />
-              검색
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleReset}
-              className="h-11 px-3"
-            >
-              초기화
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
 });

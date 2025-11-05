@@ -30,10 +30,10 @@ export default function App() {
     return user.role === 'ROLE_HOST' || user.role === 'ROLE_ADMIN';
   }, [user]);
 
+  // (모달 상태)
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showHostApplicationModal, setShowHostApplicationModal] = useState(false);
   const [isHostLoading, setIsHostLoading] = useState(false);
-
   const [showSpaceRegistration, setShowSpaceRegistration] = useState(false);
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -41,11 +41,10 @@ export default function App() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [bookingData, setBookingData] = useState(null);
 
-  // ... (API 연동 상태 등) ...
+  // (API 연동 상태)
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearched, setIsSearched] = useState(false);
-  const [showAllMode, setShowAllMode] = useState(false);
   const [pagination, setPagination] = useState({
     page: 0,
     size: 20,
@@ -60,22 +59,12 @@ export default function App() {
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
 
-  // (AuthModal 띄우기)
-  const handleShowLoginModal = useCallback(() => {
-    setShowAuthModal(true);
-  }, []);
+  // (Auth 핸들러)
+  const handleShowLoginModal = useCallback(() => { setShowAuthModal(true); }, []);
+  const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => { authService.redirectToOidcLogin(provider); }, []);
+  const handleLogout = useCallback(() => { authService.logout(); }, []);
 
-  // (AuthModal에서 로그인 실행)
-  const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => {
-    authService.redirectToOidcLogin(provider);
-  }, []);
-
-  // 로그아웃
-  const handleLogout = useCallback(() => {
-    authService.logout();
-  }, []);
-
-  // 로그인 상태 확인 (페이지 로드 시)
+  // (로그인 상태 확인)
   const checkLoginStatus = useCallback(async () => {
     try {
       const userData = await authService.getCurrentUser();
@@ -90,9 +79,12 @@ export default function App() {
     checkLoginStatus();
   }, [checkLoginStatus]);
 
-  // 공간 데이터 불러오기
+  // (공간 데이터 불러오기 - "전체" 또는 "검색")
   const fetchSpaces = useCallback(async (params: SpaceSearchParams) => {
     setIsLoading(true);
+    const searchParamCount = Object.values(params).filter(v => v !== undefined && v !== '' && v !== 0).length;
+    setIsSearched(searchParamCount > 3);
+
     try {
       const response = await spaceService.searchSpaces(params);
       if (params.page === 0 || params.page === undefined) {
@@ -114,21 +106,59 @@ export default function App() {
     }
   }, []);
 
-  // (useEffect, ... 나머지 핸들러들 ...)
+  // ★ (수정) "내 공간" 불러오기
+  const fetchMySpaces = useCallback(async (page = 0) => {
+    setIsLoading(true);
+    setIsSearched(false);
+    try {
+      // ★ (수정) spaceService.getMySpaces에 page와 size만 전달합니다.
+      const response = await spaceService.getMySpaces(page, pagination.size);
+      if (page === 0) {
+        setSpaces(response.content);
+      } else {
+        setSpaces(prev => [...prev, ...response.content]);
+      }
+      setPagination({
+        page: response.number,
+        size: response.size,
+        totalPages: response.totalPages,
+        totalElements: response.totalElements
+      });
+    } catch (err) {
+      console.error("API Error fetching my spaces:", err);
+      // ★ "내 공간 정보를 불러오는 데 실패했습니다."가 여기서 발생합니다.
+      toast.error('내 공간 정보를 불러오는 데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.size]); // (의존성에서 pagination.size만 남김)
+
+  // (컴포넌트 마운트 시)
+  useEffect(() => {
+    // (isHost 값이 확정된 *후에* 기본 데이터를 로드)
+  }, []);
+
   useEffect(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
-    fetchSpaces(initialParams);
-    setCurrentFilters(initialParams);
+
+    if (isHost) {
+      fetchMySpaces(0);
+      setCurrentFilters({});
+    } else {
+      fetchSpaces(initialParams);
+      setCurrentFilters(initialParams);
+    }
+
     const savedFavorites = localStorage.getItem('anyplace_favorites');
     const savedRecentlyViewed = localStorage.getItem('anyplace_recently_viewed');
     if (savedFavorites) setFavoriteSpaces(JSON.parse(savedFavorites));
     if (savedRecentlyViewed) setRecentlyViewed(JSON.parse(savedRecentlyViewed));
-  }, [fetchSpaces, pagination.size]);
+  }, [isHost, fetchSpaces, fetchMySpaces, pagination.size]);
 
   useEffect(() => { localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces)); }, [favoriteSpaces]);
   useEffect(() => { localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed)); }, [recentlyViewed]);
 
-  // ("호스트 되기" 버튼 클릭 시)
+  // ("호스트 되기" 핸들러)
   const handleToggleHostMode = useCallback(() => {
     if (isHost) {
       toast.info("이미 호스트 권한을 가지고 있습니다.");
@@ -154,39 +184,100 @@ export default function App() {
   }, [checkLoginStatus]);
 
 
-  // ★★★ (수정) 공간 등록 핸들러 ★★★
   const handleSpaceRegistration = async (spaceData: any) => {
-    // (수정) try/catch를 SpaceRegistration.tsx로 이동시킵니다.
-    // 이 함수는 API 호출과 UI 갱신만 책임집니다.
-
-    // 1. API 호출 (DB 저장)
     const newSpace = await spaceService.createSpace(spaceData);
-
-    // 2. UI 갱신 (화면에 새 공간 추가)
     setSpaces(prev => [newSpace, ...prev]);
   };
 
-  // (나머지 핸들러들 ...)
   const handleDeleteSpace = async (spaceId: string) => { /* ... */ };
-  const handleClearFilters = useCallback(() => { /* ... */ }, [fetchSpaces, pagination.size]);
-  const handleShowAllSpaces = () => { /* ... */ };
-  const handleQuickFilter = useCallback((filters: { /* ... */ }) => { /* ... */ }, [fetchSpaces, pagination.size]);
+
+  // (필터 초기화 및 전체 공간 보기)
+  const handleClearFilters = useCallback(() => {
+    const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
+    fetchSpaces(initialParams);
+    setCurrentFilters(initialParams);
+  }, [fetchSpaces, pagination.size]);
+
+  // ("검색" 핸들러)
+  const handleQuickFilter = useCallback((filters: {
+    date: string;
+    province: string;
+    district: string;
+    capacity: number;
+    spaceType: string;
+  }) => {
+    const params: SpaceSearchParams = {
+      page: 0,
+      size: pagination.size,
+      sort: 'createdAt,desc', // ★ (수정) 검색 시에는 정렬 파라미터를 보냅니다.
+      city: filters.province || undefined,
+      district: filters.district || undefined,
+      type: filters.spaceType || undefined,
+      minCapacity: filters.capacity > 0 ? filters.capacity : undefined,
+      checkInDate: filters.date || undefined,
+    };
+
+    fetchSpaces(params);
+    setCurrentFilters(params);
+
+    setTimeout(() => {
+      const searchResultsElement = document.getElementById('search-results-section');
+      if (searchResultsElement) {
+        searchResultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  }, [fetchSpaces, pagination.size]);
+
+  // (핸들러 ...)
   const handleViewSpace = (spaceId: string) => { /* ... */ };
   const handleBookSpace = (spaceId: string) => { /* ... */ };
   const handleConfirmBooking = (bookingInfo: any) => { /* ... */ };
   const handlePaymentSuccess = (paymentInfo: any) => { /* ... */ };
   const handleUpdateReservation = (reservationId: string, status: string) => { /* ... */ };
   const handleCancelReservation = (reservationId: string) => { /* ... */ };
-  const handleNavigate = (view: string) => { setCurrentView(view); };
-  const handleResetToHome = useCallback(() => { /* ... */ }, [handleClearFilters]);
+
+  // ("내 공간" / "찜한 공간" 등 네비게이션)
+  const handleNavigate = (view: string) => {
+    setCurrentView(view);
+
+    if (view === 'home') {
+      if (isHost) {
+        fetchMySpaces(0);
+      } else {
+        handleClearFilters();
+      }
+    }
+  };
+
+  // (로고 클릭 시)
+  const handleResetToHome = useCallback(() => {
+    setCurrentView('home');
+    // ... (모달 닫기)
+
+    if (isHost) {
+      fetchMySpaces(0);
+    } else {
+      handleClearFilters();
+    }
+
+    toast.success('홈으로 돌아왔습니다');
+  }, [isHost, handleClearFilters, fetchMySpaces]);
+
   const handleToggleFavorite = useCallback((spaceId: string) => { /* ... */ }, []);
   const addToRecentlyViewed = useCallback((spaceId: string) => { /* ... */ }, []);
-  const mySpaces = useMemo(() => isHost ? spaces.filter(space => String(space.hostId) === user?.id) : [], [isHost, spaces, user?.id]);
-  const displaySpaces = useMemo(() => isHost ? mySpaces : spaces, [isHost, mySpaces, spaces]);
-  const recommendedSpaces = useMemo(() => spaces.filter(space => (space.available ?? true)).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 6), [spaces]);
-  const popularSpaces = useMemo(() => spaces.filter(space => (space.available ?? true) && (space.rating ?? 0) >= 4.6).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 6), [spaces]);
-  const recentlyViewedSpaces = useMemo(() => recentlyViewed.map(id => spaces.find(space => space.id === id)).filter((space): space is Space => !!space).slice(0, 6), [recentlyViewed, spaces]);
-  const handleLoadMore = () => { /* ... */ };
+
+  const displaySpaces = useMemo(() => spaces, [spaces]);
+
+  const handleLoadMore = () => {
+    if (pagination.page < pagination.totalPages - 1) {
+      const nextParams = { ...currentFilters, page: pagination.page + 1 };
+      if (isHost && currentView === 'home' && !isSearched) { // ★ (수정) 호스트이고, 홈 뷰이고, 검색 중이 아닐 때
+        fetchMySpaces(pagination.page + 1);
+      } else {
+        fetchSpaces(nextParams);
+      }
+    }
+  };
 
 
   return (
@@ -203,7 +294,7 @@ export default function App() {
       />
 
       <main className="container mx-auto px-4 py-8">
-        {/* ... (Reservations, Favorites View) ... */}
+        {/* Reservations View */}
         {currentView === 'reservations' && (
           <Suspense fallback={<LoadingSpinner size="lg" />}>
             <ReservationDashboard
@@ -214,6 +305,8 @@ export default function App() {
             />
           </Suspense>
         )}
+
+        {/* Favorites View */}
         {currentView === 'favorites' && ( <div>{/* 찜한 공간 뷰 (나중에 구현) */}</div> )}
 
         {/* Home View */}
@@ -243,7 +336,7 @@ export default function App() {
             )}
 
             {/* (Search Results Alert) */}
-            {isSearched && !showAllMode && !isHost && (
+            {isSearched && !isHost && (
               <div className="mb-6 p-4 rounded-lg bg-gray-100 border" id="search-results-section">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -259,21 +352,21 @@ export default function App() {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={handleShowAllSpaces}
+                    onClick={handleClearFilters}
                     className="bg-white"
                   >
-                    전체 보기 ({pagination.totalElements}개)
+                    필터 초기화
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* (Spaces Section - 복원됨) */}
+            {/* (Spaces Section) */}
             <div className="p-6 rounded-xl border bg-card/50" id="spaces-section">
                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div>
                   <h3 className="text-2xl font-semibold">
-                    {isHost ? '내 공간 관리' : (isSearched ? '공간 목록' : '전체 공간')}
+                    {isHost ? '내 공간 관리' : (isSearched ? '검색된 공간' : '전체 공간')}
                   </h3>
                   <p className="text-muted-foreground">
                     {isHost ? '등록한 공간을 확인하고 관리하세요' : (isSearched ? '검색 조건에 맞는 공간입니다' : 'anyplace에 등록된 전체 공간입니다')}
@@ -311,7 +404,9 @@ export default function App() {
                 <div className="text-center py-16">
                    <h4 className="text-xl font-medium mb-2">결과 없음</h4>
                    <p className="text-muted-foreground">
-                     {isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.'}
+                     {isHost ? '아직 등록한 공간이 없습니다.' :
+                      (isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.')
+                     }
                    </p>
                    {isSearched && (
                      <Button variant="outline" onClick={handleClearFilters} className="mt-4">
@@ -359,22 +454,18 @@ export default function App() {
         )}
       </main>
 
-      {/* (AuthModal 렌더링) */}
+      {/* (모달 및 Suspense 코드) */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onLogin={handleOidcLogin}
       />
-
-      {/* (호스트 신청 모달 렌더링) */}
       <HostApplicationModal
         isOpen={showHostApplicationModal}
         onClose={() => setShowHostApplicationModal(false)}
         onSubmit={handleHostApplicationSubmit}
         isLoading={isHostLoading}
       />
-
-      {/* (Suspense 컴포넌트들) */}
       <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
         <SpaceRegistration
           isOpen={showSpaceRegistration}

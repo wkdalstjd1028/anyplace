@@ -36,6 +36,13 @@ public class SpaceService {
         return spacePage.map(this::entityToDto);
     }
 
+    // ★ (추가) "내 공간" 조회 서비스
+    @Transactional(readOnly = true)
+    public Page<SpaceDTO> findSpacesByHostId(Long hostId, Pageable pageable) {
+        Page<Space> spacePage = spaceRepository.findByHostId(hostId, pageable);
+        return spacePage.map(this::entityToDto);
+    }
+
     @Transactional(readOnly = true)
     public List<SpaceDTO> getAllSpaces() {
         return spaceRepository.findAll().stream()

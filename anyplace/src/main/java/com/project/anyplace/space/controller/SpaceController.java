@@ -72,6 +72,18 @@ public class SpaceController {
         return spaceService.searchSpaces(request, pageable);
     }
 
+    // ★ (추가) "내 공간" API
+    @GetMapping("/my")
+    public Page<SpaceDTO> getMySpaces(
+            @AuthenticationPrincipal OAuth2User oauth2User,
+            // ★ (수정) React가 sort를 보내지 않으므로, 여기서 기본 정렬을 적용합니다.
+            @PageableDefault(size = 20, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC)
+            Pageable pageable) {
+
+        Long currentUserId = getUserIdFromPrincipal(oauth2User);
+        return spaceService.findSpacesByHostId(currentUserId, pageable);
+    }
+
     @PostMapping
     public SpaceDTO createSpace(@Valid @RequestBody SpaceDTO dto,
                                 @AuthenticationPrincipal OAuth2User oauth2User // ★ (수정) OidcUser -> OAuth2User
