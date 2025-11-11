@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Clock, Users, MapPin, CreditCard } from 'lucide-react';
-import { toast } from 'sonner'; // (버전 정보 @2.0.3 제거)
+import { toast } from 'sonner';
 
 interface BookingModalProps {
   space: any;
@@ -32,7 +32,6 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
   }
 
   const calculateTotal = () => {
-    // 1. (수정) space.price -> space.pricePerHour
     if (!startTime || !endTime || !space?.pricePerHour) return 0;
 
     const start = parseInt(startTime.split(':')[0]);

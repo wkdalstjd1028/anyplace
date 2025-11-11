@@ -3,7 +3,6 @@ package com.project.anyplace.reservation.dto;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// types.ts의 BookingAvailabilityRequest
 @Getter
 @NoArgsConstructor
 public class ReservationAvailabilityRequest {

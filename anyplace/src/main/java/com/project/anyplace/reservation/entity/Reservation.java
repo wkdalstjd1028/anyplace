@@ -6,7 +6,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.GenericGenerator;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -22,9 +21,9 @@ import java.time.LocalDateTime;
 public class Reservation {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID) // ⬅️ 이 부분을 수정
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(columnDefinition = "VARCHAR(36)")
-    private String id;
+    private  String id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -32,13 +31,13 @@ public class Reservation {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id", nullable = false)
-    private Space space; // Space 엔티티 (ID: Long)
+    private Space space;
 
     @Column(nullable = false)
-    private LocalDateTime startDateTime; // checkInDate + checkInTime
+    private LocalDateTime startDateTime;
 
     @Column(nullable = false)
-    private LocalDateTime endDateTime;   // checkOutDate + checkOutTime
+    private LocalDateTime endDateTime;
 
     @Column(nullable = false)
     private Integer guests;

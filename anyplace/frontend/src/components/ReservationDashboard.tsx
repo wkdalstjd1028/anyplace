@@ -6,8 +6,8 @@ import { Badge } from './ui/badge';
 import { Calendar, Clock, MapPin, Users, Phone, Mail, MoreHorizontal, CheckCircle, XCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Booking, BookingStatus, User } from '../../lib/types'; // (경로 확인!)
-import { LoadingSpinner } from './LoadingSpinner'; // ⭐️ 1. import 구문 추가
+import { Booking, BookingStatus, User } from '../../lib/types';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface ReservationDashboardProps {
   isHost: boolean;
@@ -55,7 +55,6 @@ export function ReservationDashboard({
   const pendingReservations = reservations.filter(r => r.status === 'PENDING');
   const confirmedReservations = reservations.filter(r => r.status === 'CONFIRMED');
 
-  // ⭐️ 2. (수정) 64번째 줄의 LoadingSpinner가 이제 정의되었습니다.
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -64,9 +63,6 @@ export function ReservationDashboard({
     );
   }
 
-  // -------------------------
-  // 1. 호스트 뷰 (isHost === true)
-  // -------------------------
   if (isHost) {
     return (
       <div className="space-y-6">
@@ -255,9 +251,6 @@ export function ReservationDashboard({
     );
   }
 
-  // -----------------------------
-  // 2. 사용자 뷰 (isHost === false)
-  // -----------------------------
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -338,5 +331,4 @@ export function ReservationDashboard({
   );
 }
 
-// (Suspense를 위해 default export 추가)
 export default ReservationDashboard;

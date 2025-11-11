@@ -13,9 +13,8 @@ import { toast, Toaster } from 'sonner';
 import spaceService from './service/spaceService';
 import authService from './service/authService';
 import bookingService from './service/bookingService';
-import { Space, SpaceSearchParams, User, Booking } from '../lib/types'; // ⭐️ Booking 타입 임포트
+import { Space, SpaceSearchParams, User, Booking } from '../lib/types';
 
-// Lazy load heavy components
 const SpaceRegistration = React.lazy(() => import('./components/SpaceRegistration').then(m => ({ default: m.SpaceRegistration })));
 const SpaceDetail = React.lazy(() => import('./components/SpaceDetail').then(m => ({ default: m.SpaceDetail })));
 const BookingModal = React.lazy(() => import('./components/BookingModal').then(m => ({ default: m.BookingModal })));
@@ -27,11 +26,9 @@ export default function App() {
 
   const isHost = useMemo(() => {
     if (!user) return false;
-    // (User.role이 'ROLE_HOST' 또는 'HOST'일 수 있으므로 startsWith 사용)
     return user.role.startsWith('HOST') || user.role.startsWith('ROLE_HOST') || user.role.startsWith('ROLE_ADMIN');
   }, [user]);
 
-  // (모달 상태)
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showHostApplicationModal, setShowHostApplicationModal] = useState(false);
   const [isHostLoading, setIsHostLoading] = useState(false);
@@ -42,7 +39,6 @@ export default function App() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [bookingData, setBookingData] = useState(null);
 
-  // (API 연동 상태)
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
@@ -55,7 +51,6 @@ export default function App() {
   });
   const [currentFilters, setCurrentFilters] = useState<SpaceSearchParams>({});
 
-  // ⭐️ 예약 데이터 상태 (타입 지정)
   const [reservations, setReservations] = useState<Booking[]>([]);
   const [isReservationLoading, setIsReservationLoading] = useState(false);
 
@@ -65,7 +60,6 @@ export default function App() {
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
 
-  // (Auth 핸들러)
   const handleShowLoginModal = useCallback(() => { setShowAuthModal(true); }, []);
   const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => { authService.redirectToOidcLogin(provider); }, []);
   const handleLogout = useCallback(() => { authService.logout(); }, []);
@@ -84,7 +78,6 @@ export default function App() {
     checkLoginStatus();
   }, [checkLoginStatus]);
 
-  // (공간 데이터 불러오기)
   const fetchSpaces = useCallback(async (params: SpaceSearchParams) => {
     setIsLoading(true);
     const searchParamCount = Object.values(params).filter(v => v !== undefined && v !== '' && v !== 0).length;
@@ -110,7 +103,6 @@ export default function App() {
     }
   }, []);
 
-  // ("내 공간" 불러오기)
   const fetchMySpaces = useCallback(async (page = 0) => {
     setIsLoading(true);
     setIsSearched(false);
@@ -135,18 +127,15 @@ export default function App() {
     }
   }, [pagination.size]);
 
-  // ⭐️ (수정) 예약 데이터 불러오기 (호스트/사용자 공용)
   const fetchReservations = useCallback(async (page = 0) => {
-    if (!user) return; // 로그인 안 했으면 실행 안 함
+    if (!user) return;
 
     setIsReservationLoading(true);
     try {
       let response;
       if (isHost) {
-        // 호스트: 받은 예약 목록 (전체 상태)
-        response = await bookingService.getHostBookings(page, 50); // (페이지 크기 50으로 임시 설정)
+        response = await bookingService.getHostBookings(page, 50);
       } else {
-        // 사용자: 내 예약 목록 (전체 상태)
         response = await bookingService.getMyBookings(page, 50);
       }
 
@@ -162,9 +151,7 @@ export default function App() {
     } finally {
       setIsReservationLoading(false);
     }
-  }, [user, isHost]); // user, isHost가 변경되면 이 함수도 새로 생성
-
-  // (isHost 값 확정 후 기본 데이터 로드)
+  }, [user, isHost]);
   useEffect(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
     if (user === null) {
@@ -184,12 +171,11 @@ export default function App() {
     const savedRecentlyViewed = localStorage.getItem('anyplace_recently_viewed');
     if (savedFavorites) setFavoriteSpaces(JSON.parse(savedFavorites));
     if (savedRecentlyViewed) setRecentlyViewed(JSON.parse(savedRecentlyViewed));
-  }, [user, isHost, fetchSpaces, fetchMySpaces, pagination.size]); // ⭐️ 'user'를 의존성에 추가
+  }, [user, isHost, fetchSpaces, fetchMySpaces, pagination.size]);
 
   useEffect(() => { localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces)); }, [favoriteSpaces]);
   useEffect(() => { localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed)); }, [recentlyViewed]);
 
-  // ("호스트 되기" 핸들러)
   const handleToggleHostMode = useCallback(() => {
     if (isHost) {
       toast.info("이미 호스트 권한을 가지고 있습니다.");
@@ -198,7 +184,6 @@ export default function App() {
     setShowHostApplicationModal(true);
   }, [isHost]);
 
-  // ("호스트 신청" 모달 Submit 시)
   const handleHostApplicationSubmit = useCallback(async (data: { businessLicenseNumber: string; description: string }) => {
     setIsHostLoading(true);
     try {
@@ -222,14 +207,12 @@ export default function App() {
 
   const handleDeleteSpace = async (spaceId: string) => { /* ... */ };
 
-  // (필터 초기화 및 전체 공간 보기)
   const handleClearFilters = useCallback(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
     fetchSpaces(initialParams);
     setCurrentFilters(initialParams);
   }, [fetchSpaces, pagination.size]);
 
-  // ("검색" 핸들러)
   const handleQuickFilter = useCallback((filters: {
     date: string;
     province: string;
@@ -255,7 +238,6 @@ export default function App() {
   }, [fetchSpaces, pagination.size]);
 
 
-  // ("공간 상세보기" 핸들러)
   const handleViewSpace = useCallback(async (spaceId: string) => {
     if (showSpaceDetail) {
       setShowSpaceDetail(false);
@@ -277,13 +259,11 @@ export default function App() {
   }, [isDetailLoading, showSpaceDetail]);
 
 
-  // ("예약하기" 버튼 클릭 시)
   const handleBookSpace = (spaceId: string) => {
     setShowSpaceDetail(false);
     setShowBookingModal(true);
   };
 
-  // ("결제하기" 버튼 클릭 시)
   const handleConfirmBooking = async (bookingInfo: any) => {
     const requestData = {
       spaceId: bookingInfo.spaceId,
@@ -308,11 +288,9 @@ export default function App() {
 
   const handlePaymentSuccess = (paymentInfo: any) => { /* ... */ };
 
-  // ⭐️ (수정) 예약 상태 변경 (승인/거절) - API 호출
   const handleUpdateReservation = async (reservationId: string, status: 'CONFIRMED' | 'REJECTED') => {
     try {
       const updatedReservation = await bookingService.updateBookingStatus(reservationId, { status });
-      // 로컬 상태(reservations) 업데이트
       setReservations(prev =>
         prev.map(res =>
           res.id === reservationId ? updatedReservation : res
@@ -325,7 +303,6 @@ export default function App() {
     }
   };
 
-  // ⭐️ (수정) 예약 취소 (사용자) - API 호출
   const handleCancelReservation = async (reservationId: string) => {
     try {
       const cancelledReservation = await bookingService.cancelBooking(reservationId, '사용자 취소');
@@ -341,17 +318,14 @@ export default function App() {
     }
   };
 
-  // ⭐️ (수정) 네비게이션 핸들러 - "예약 관리" 클릭 시 데이터 로드
   const handleNavigate = (view: string) => {
     setCurrentView(view);
 
     if (view === 'reservations') {
-      // "예약 관리" 탭 클릭 시 예약 데이터 불러오기
       fetchReservations(0);
     }
   };
 
-  // (로고 클릭 시)
   const handleResetToHome = useCallback(() => {
     setCurrentView('home');
     setShowSpaceDetail(false);
@@ -401,12 +375,12 @@ export default function App() {
         {currentView === 'reservations' && (
           <Suspense fallback={<LoadingSpinner size="lg" />}>
             <ReservationDashboard
-              reservations={reservations} // ⭐️ App.tsx가 (호스트/사용자) 필터링한 목록
-              onUpdateReservation={handleUpdateReservation} // ⭐️ 승인/거절 함수 전달
-              onCancelReservation={handleCancelReservation} // ⭐️ 취소 함수 전달
+              reservations={reservations}
+              onUpdateReservation={handleUpdateReservation}
+              onCancelReservation={handleCancelReservation}
               isHost={isHost}
-              isLoading={isReservationLoading} // ⭐️ 로딩 상태 전달
-              user={user} // ⭐️ 사용자 정보 전달 (필터링에 필요)
+              isLoading={isReservationLoading}
+              user={user}
             />
           </Suspense>
         )}

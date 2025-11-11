@@ -61,11 +61,8 @@ public class ReservationService {
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setSpecialRequests(dto.getSpecialRequests());
 
-        // ⭐️⭐️ (수정) save() -> saveAndFlush() ⭐️⭐️
-        // Auditing(@CreatedDate)이 적용된 값을 즉시 받아오기 위해 flush합니다.
         Reservation savedReservation = reservationRepository.saveAndFlush(reservation);
 
-        // 이제 savedReservation.getCreatedAt()이 null이 아닙니다.
         return new ReservationResponse(savedReservation);
     }
 
@@ -145,7 +142,6 @@ public class ReservationService {
     }
 
 
-    // --- Helper Methods ---
     private LocalDateTime parseDateTime(String date, String time) {
         return LocalDateTime.of(LocalDate.parse(date), LocalTime.parse(time));
     }

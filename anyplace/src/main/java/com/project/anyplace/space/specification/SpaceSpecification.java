@@ -49,13 +49,10 @@ public class SpaceSpecification {
             }
 
 
-            // ★ (2. 임시 주석 처리)
-            // (나중에 Reservation 엔티티를 만든 후 이 주석을 해제해야 합니다.)
-            /*
             if (request.getCheckInDate() != null && request.getCheckOutDate() != null) {
 
                 Subquery<Long> subquery = query.subquery(Long.class);
-                Root<Reservation> bookingRoot = subquery.from(Reservation.class); // Booking 테이블 조인
+                Root<Reservation> bookingRoot = subquery.from(Reservation.class);
 
                 Predicate overlap = cb.and(
                         cb.lessThan(bookingRoot.get("startDate"), request.getCheckOutDate()),
@@ -69,9 +66,6 @@ public class SpaceSpecification {
 
                 predicates.add(cb.not(root.get("id").in(subquery)));
             }
-            */
-
-
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

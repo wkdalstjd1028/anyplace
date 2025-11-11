@@ -7,7 +7,6 @@ import lombok.Getter;
 @Getter
 public class ReservationResponse {
 
-    // ⭐️ 모든 필드에 'final' 추가
     private final String id;
     private final String userId;
     private final String userName;
@@ -52,6 +51,6 @@ public class ReservationResponse {
         this.spaceAddress = reservation.getSpace().getAddress();
 
         this.hostId = String.valueOf(reservation.getSpace().getHostId());
-        this.hostName = null; // (Service에서 조회 필요)
+        this.hostName = null;
     }
 }
