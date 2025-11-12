@@ -63,7 +63,8 @@ public class ReservationService {
 
         Reservation savedReservation = reservationRepository.saveAndFlush(reservation);
 
-        return new ReservationResponse(savedReservation);
+        // ★ (수정) ReservationResponse.fromEntity 사용
+        return ReservationResponse.fromEntity(savedReservation);
     }
 
     public Page<ReservationResponse> getMyReservations(String userId, int page, int size, String status) {
@@ -77,12 +78,14 @@ public class ReservationService {
             reservationPage = reservationRepository.findByUser(user, pageable);
         }
 
-        return reservationPage.map(ReservationResponse::new);
+        // ★ (수정) map(ReservationResponse::new) 대신 map(ReservationResponse::fromEntity) 사용
+        return reservationPage.map(ReservationResponse::fromEntity);
     }
 
     public ReservationResponse getReservationById(String reservationId) {
         Reservation reservation = findReservationById(reservationId);
-        return new ReservationResponse(reservation);
+        // ★ (수정) new ReservationResponse(reservation) 대신
+        return ReservationResponse.fromEntity(reservation);
     }
 
     @Transactional
@@ -95,7 +98,8 @@ public class ReservationService {
         }
 
         reservation.setStatus(ReservationStatus.CANCELLED);
-        return new ReservationResponse(reservation);
+        // ★ (수정) ReservationResponse.fromEntity 사용
+        return ReservationResponse.fromEntity(reservation);
     }
 
     public ReservationAvailabilityResponse checkAvailability(ReservationAvailabilityRequest dto) {
@@ -125,7 +129,8 @@ public class ReservationService {
             reservationPage = reservationRepository.findBySpaceHostId(hostLongId, pageable);
         }
 
-        return reservationPage.map(ReservationResponse::new);
+        // ★ (수정) map(ReservationResponse::new) 대신 map(ReservationResponse::fromEntity) 사용
+        return reservationPage.map(ReservationResponse::fromEntity);
     }
 
     @Transactional
@@ -138,7 +143,8 @@ public class ReservationService {
         }
 
         reservation.setStatus(dto.getStatus());
-        return new ReservationResponse(reservation);
+        // ★ (수정) ReservationResponse.fromEntity 사용
+        return ReservationResponse.fromEntity(reservation);
     }
 
 

@@ -9,10 +9,14 @@ import { Separator } from './ui/separator';
 import { Clock, Users, MapPin, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 
+import bookingService from '../service/bookingService'; // ★ (1. API 서비스 임포트)
+import { LoadingSpinner } from './LoadingSpinner'; // (로딩 스피너 임포트)
+
 interface BookingModalProps {
   space: any;
   isOpen: boolean;
   onClose: () => void;
+  // ★ (2. onConfirm은 예약 객체 전체를 받도록 수정)
   onConfirm: (bookingData: any) => void;
 }
 
@@ -26,6 +30,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
   const [headCount, setHeadCount] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false); // ★ (3. 로딩 상태 추가)
 
   if (!space) {
     return null;
@@ -41,7 +46,8 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
     return duration > 0 ? duration * space.pricePerHour : 0;
   };
 
-  const handleConfirm = () => {
+  // ★ (4. handleConfirm을 async로 수정)
+  const handleConfirm = async () => {
     if (!selectedDate || !startTime || !endTime || !headCount) {
       toast.error('모든 정보를 입력해주세요');
       return;
@@ -55,18 +61,38 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
       return;
     }
 
-    const bookingData = {
-      spaceId: space?.id || '',
-      spaceName: space?.name || '', // 2. (수정) space.title -> space.name
-      date: selectedDate,
-      startTime,
-      endTime,
-      headCount: parseInt(headCount),
-      totalAmount: calculateTotal(),
-      duration: end - start
+    // ★ (5. 백엔드 DTO 형식에 맞춤)
+    const checkInDate = selectedDate.toISOString().split('T')[0];
+    const checkOutDate = selectedDate.toISOString().split('T')[0];
+
+    // 백엔드 요청 데이터
+    const createRequest = {
+      spaceId: String(space?.id), // Long -> String
+      checkInDate,
+      checkOutDate,
+      checkInTime: startTime + ':00', // 초(second) 추가
+      checkOutTime: endTime + ':00', // 초(second) 추가
+      guests: parseInt(headCount),
+      specialRequests: '' // (임시)
     };
 
-    onConfirm(bookingData);
+    setIsSubmitting(true);
+    try {
+      // ★ (6. API 호출: 예약 생성 요청)
+      const createdBooking = await bookingService.createBooking(createRequest);
+
+      // ★ (7. 성공 시 onConfirm에 생성된 예약 객체 전달)
+      // 이 객체는 PaymentModal로 넘어갑니다.
+      onConfirm(createdBooking);
+      onClose(); // 모달 닫기
+
+    } catch (error: any) {
+      console.error("Booking creation failed:", error);
+      // 백엔드 유효성 검사 실패 메시지 등을 토스트로 표시
+      toast.error(error.response?.data?.message || '예약 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const availableEndTimes = timeSlots.filter(time => {
@@ -126,7 +152,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold mb-3">시작 시간</h3>
-              <Select value={startTime} onValueChange={setStartTime}>
+              <Select value={startTime} onValueChange={setStartTime} disabled={isSubmitting}>
                 <SelectTrigger>
                   <SelectValue placeholder="시작 시간 선택" />
                 </SelectTrigger>
@@ -145,11 +171,10 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
 
             <div>
               <h3 className="font-semibold mb-3">종료 시간</h3>
-              <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
+              <Select value={endTime} onValueChange={setEndTime} disabled={!startTime || isSubmitting}>
                 <SelectTrigger>
                   <SelectValue placeholder="종료 시간 선택" />
                 </SelectTrigger>
-                {/* ⭐️ 4. (오타 수정) </Trigger> -> </SelectTrigger> */}
                 <SelectContent>
                   {availableEndTimes.map((time) => (
                     <SelectItem key={time} value={time}>
@@ -167,7 +192,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
           {/* Head Count */}
           <div>
             <h3 className="font-semibold mb-3">이용 인원</h3>
-            <Select value={headCount} onValueChange={setHeadCount}>
+            <Select value={headCount} onValueChange={setHeadCount} disabled={isSubmitting}>
               <SelectTrigger>
                 <SelectValue placeholder="인원 수 선택" />
               </SelectTrigger>
@@ -221,12 +246,16 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} className="flex-1">
+            <Button variant="outline" onClick={onClose} className="flex-1" disabled={isSubmitting}>
               취소
             </Button>
-            <Button onClick={handleConfirm} className="flex-1">
-              <CreditCard className="w-4 h-4 mr-2" />
-              결제하기
+            <Button onClick={handleConfirm} className="flex-1" disabled={isSubmitting || !selectedDate || !startTime || !endTime || !headCount}>
+              {isSubmitting ? <LoadingSpinner size="sm" /> :
+                <>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  결제하기
+                </>
+              }
             </Button>
           </div>
         </div>

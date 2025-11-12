@@ -3,8 +3,12 @@ package com.project.anyplace.reservation.dto;
 import com.project.anyplace.reservation.entity.Reservation;
 import com.project.anyplace.reservation.entity.ReservationStatus;
 import lombok.Getter;
+import lombok.Builder; // ★ (1. Builder 임포트)
+
+import java.time.LocalDateTime; // ★ (2. LocalDateTime 임포트)
 
 @Getter
+@Builder // ★ (3. Builder 어노테이션 추가)
 public class ReservationResponse {
 
     private final String id;
@@ -27,30 +31,34 @@ public class ReservationResponse {
     private final String createdAt;
     private final String updatedAt;
 
-    public ReservationResponse(Reservation reservation) {
-        this.id = reservation.getId();
-        this.status = reservation.getStatus();
-        this.guests = reservation.getGuests();
-        this.totalPrice = reservation.getTotalPrice();
-        this.specialRequests = reservation.getSpecialRequests();
+    // ★ (4. Reservation 엔티티를 DTO로 변환하는 정적 팩토리 메서드 추가)
+    public static ReservationResponse fromEntity(Reservation reservation) {
+        return ReservationResponse.builder()
+                .id(reservation.getId())
+                .status(reservation.getStatus())
+                .guests(reservation.getGuests())
+                .totalPrice(reservation.getTotalPrice())
+                .specialRequests(reservation.getSpecialRequests())
 
-        this.checkInDate = reservation.getStartDateTime().toLocalDate().toString();
-        this.checkInTime = reservation.getStartDateTime().toLocalTime().toString();
-        this.checkOutDate = reservation.getEndDateTime().toLocalDate().toString();
-        this.checkOutTime = reservation.getEndDateTime().toLocalTime().toString();
+                .checkInDate(reservation.getStartDateTime().toLocalDate().toString())
+                .checkInTime(reservation.getStartDateTime().toLocalTime().toString())
+                .checkOutDate(reservation.getEndDateTime().toLocalDate().toString())
+                .checkOutTime(reservation.getEndDateTime().toLocalTime().toString())
 
-        this.createdAt = reservation.getCreatedAt().toString();
-        this.updatedAt = reservation.getUpdatedAt().toString();
+                .createdAt(reservation.getCreatedAt().toString())
+                .updatedAt(reservation.getUpdatedAt().toString())
 
-        this.userId = String.valueOf(reservation.getUser().getId());
-        this.userName = reservation.getUser().getName();
-        this.userEmail = reservation.getUser().getEmail();
+                .userId(String.valueOf(reservation.getUser().getId()))
+                .userName(reservation.getUser().getName())
+                .userEmail(reservation.getUser().getEmail())
 
-        this.spaceId = String.valueOf(reservation.getSpace().getId());
-        this.spaceName = reservation.getSpace().getName();
-        this.spaceAddress = reservation.getSpace().getAddress();
+                .spaceId(String.valueOf(reservation.getSpace().getId()))
+                .spaceName(reservation.getSpace().getName())
+                .spaceAddress(reservation.getSpace().getAddress())
 
-        this.hostId = String.valueOf(reservation.getSpace().getHostId());
-        this.hostName = null;
+                // ★ (수정) HostId는 Long 타입이지만, 편의상 HostName은 null 유지
+                .hostId(String.valueOf(reservation.getSpace().getHostId()))
+                .hostName(null)
+                .build();
     }
 }

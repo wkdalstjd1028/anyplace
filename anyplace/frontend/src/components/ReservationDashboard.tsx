@@ -18,6 +18,20 @@ interface ReservationDashboardProps {
   isLoading: boolean;
 }
 
+// ★ (추가) 날짜 포맷팅 헬퍼 (예: 2025-11-06 -> 2025. 11. 6.)
+const formatDate = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString + 'T00:00:00'); // UTC 자정으로 설정
+  return date.toLocaleDateString('ko-KR');
+};
+
+// ★ (추가) 시간 포맷팅 헬퍼 (예: 09:00:00 -> 09:00)
+const formatTime = (timeString: string) => {
+  if (!timeString) return '';
+  return timeString.substring(0, 5); // "09:00:00" -> "09:00"
+};
+
+
 export function ReservationDashboard({
   isHost,
   user,
@@ -40,14 +54,13 @@ export function ReservationDashboard({
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  // (핸들러들은 App.tsx와 완벽히 연동되므로 수정 불필요)
   const handleApprove = (reservationId: string) => {
     onUpdateReservation(reservationId, 'CONFIRMED');
   };
-
   const handleReject = (reservationId: string) => {
     onUpdateReservation(reservationId, 'REJECTED');
   };
-
   const handleCancel = (reservationId: string) => {
     onCancelReservation(reservationId);
   };
@@ -66,6 +79,7 @@ export function ReservationDashboard({
   if (isHost) {
     return (
       <div className="space-y-6">
+        {/* (호스트 헤더) */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold">예약 관리</h2>
@@ -117,11 +131,13 @@ export function ReservationDashboard({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
+                        {/* ★ (수정) 날짜 포맷팅 */}
+                        <span>{formatDate(reservation.checkInDate)}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
+                        {/* ★ (수정) 시간 포맷팅 */}
+                        <span>{formatTime(reservation.checkInTime)} - {formatTime(reservation.checkOutTime)}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Users className="w-4 h-4 text-muted-foreground" />
@@ -157,7 +173,8 @@ export function ReservationDashboard({
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-muted-foreground">예약 일시:</span>
-                          <span className="ml-2 font-medium">{new Date(reservation.createdAt).toLocaleString('ko-KR')}</span>
+                          {/* ★ (수정) createdAt도 이미 문자열이므로 new Date() 제거 */}
+                          <span className="ml-2 font-medium">{formatDate(reservation.createdAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -184,11 +201,11 @@ export function ReservationDashboard({
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div className="flex items-center space-x-2">
                           <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
+                          <span>{formatDate(reservation.checkInDate)}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
+                          <span>{formatTime(reservation.checkInTime)} - {formatTime(reservation.checkOutTime)}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Users className="w-4 h-4 text-muted-foreground" />
@@ -224,11 +241,11 @@ export function ReservationDashboard({
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div className="flex items-center space-x-2">
                           <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
+                          <span>{formatDate(reservation.checkInDate)}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
+                          <span>{formatTime(reservation.checkInTime)} - {formatTime(reservation.checkOutTime)}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Users className="w-4 h-4 text-muted-foreground" />
@@ -251,6 +268,7 @@ export function ReservationDashboard({
     );
   }
 
+  // (게스트 뷰)
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -264,7 +282,7 @@ export function ReservationDashboard({
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground mb-4">예약 내역이 없습니다</p>
-            <Button>공간 둘러보기</Button>
+            {/* <Button>공간 둘러보기</Button> (App.tsx에 연결 필요) */}
           </CardContent>
         </Card>
       ) : (
@@ -303,11 +321,11 @@ export function ReservationDashboard({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{new Date(reservation.checkInDate).toLocaleDateString('ko-KR')}</span>
+                    <span>{formatDate(reservation.checkInDate)}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>{reservation.checkInTime} - {reservation.checkOutTime}</span>
+                    <span>{formatTime(reservation.checkInTime)} - {formatTime(reservation.checkOutTime)}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Users className="w-4 h-4 text-muted-foreground" />

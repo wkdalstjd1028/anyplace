@@ -26,7 +26,8 @@ export default function App() {
 
   const isHost = useMemo(() => {
     if (!user) return false;
-    return user.role.startsWith('HOST') || user.role.startsWith('ROLE_HOST') || user.role.startsWith('ROLE_ADMIN');
+    // (수정) ROLE_HOST와 HOST 둘 다 안전하게 체크
+    return user.role === 'ROLE_HOST' || user.role === 'HOST' || user.role === 'ROLE_ADMIN';
   }, [user]);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -127,8 +128,9 @@ export default function App() {
     }
   }, [pagination.size]);
 
+  // (예약 조회)
   const fetchReservations = useCallback(async (page = 0) => {
-    if (!user) return;
+    if (!user) return; // (추가) user가 확정된 후에만 실행
 
     setIsReservationLoading(true);
     try {
@@ -151,27 +153,31 @@ export default function App() {
     } finally {
       setIsReservationLoading(false);
     }
-  }, [user, isHost]);
+  }, [user, isHost]); // (user, isHost 의존성)
+
+  // ★ (수정) user/isHost가 확정된 *후에* 홈 화면 데이터를 로드합니다.
   useEffect(() => {
+    // checkLoginStatus가 아직 실행 중일 때(user가 undefined)는 실행 방지
+    if (typeof user === 'undefined') {
+      return;
+    }
+
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
-    if (user === null) {
+
+    if (isHost) {
+      fetchMySpaces(0);
+      setCurrentFilters({});
+    } else {
       fetchSpaces(initialParams);
       setCurrentFilters(initialParams);
-    } else {
-      if (isHost) {
-        fetchMySpaces(0);
-        setCurrentFilters({});
-      } else {
-        fetchSpaces(initialParams);
-        setCurrentFilters(initialParams);
-      }
     }
 
     const savedFavorites = localStorage.getItem('anyplace_favorites');
     const savedRecentlyViewed = localStorage.getItem('anyplace_recently_viewed');
     if (savedFavorites) setFavoriteSpaces(JSON.parse(savedFavorites));
     if (savedRecentlyViewed) setRecentlyViewed(JSON.parse(savedRecentlyViewed));
-  }, [user, isHost, fetchSpaces, fetchMySpaces, pagination.size]);
+
+  }, [user, isHost, fetchSpaces, fetchMySpaces, pagination.size]); // (user 의존성 추가)
 
   useEffect(() => { localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces)); }, [favoriteSpaces]);
   useEffect(() => { localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed)); }, [recentlyViewed]);
@@ -261,24 +267,37 @@ export default function App() {
 
   const handleBookSpace = (spaceId: string) => {
     setShowSpaceDetail(false);
+    // (spaceId를 이미 selectedSpace.id로 가지고 있으므로,
+    // selectedSpace를 null로 만들지 않고 BookingModal을 띄웁니다.)
     setShowBookingModal(true);
   };
 
+  // (게스트 예약 생성)
   const handleConfirmBooking = async (bookingInfo: any) => {
+    // (bookingInfo는 BookingModal에서 받은 폼 데이터)
     const requestData = {
       spaceId: bookingInfo.spaceId,
       checkInDate: bookingInfo.date.toISOString().split('T')[0],
       checkOutDate: bookingInfo.date.toISOString().split('T')[0],
-      checkInTime: bookingInfo.startTime,
-      checkOutTime: bookingInfo.endTime,
+      checkInTime: bookingInfo.startTime + ':00', // (초 추가)
+      checkOutTime: bookingInfo.endTime + ':00', // (초 추가)
       guests: bookingInfo.headCount,
-      specialRequests: ''
+      specialRequests: '' // (임시)
     };
+
     try {
-      await bookingService.createBooking(requestData);
-      toast.success('예약이 성공적으로 완료되었습니다!');
+      // (API 호출)
+      const createdBooking = await bookingService.createBooking(requestData);
+
+      // (성공 시)
+      toast.success('예약 요청이 완료되었습니다. 호스트의 승인을 기다리세요.');
       setShowBookingModal(false);
       setSelectedSpace(null);
+
+      // (참고: 원래 이 다음에 결제 모달(PaymentModal)을 띄워야 함)
+      // setBookingData(createdBooking);
+      // setShowPaymentModal(true);
+
     } catch (error: any) {
       console.error('예약 생성 실패:', error);
       const errorMessage = error.response?.data?.message || '예약에 실패했습니다. 이미 예약된 시간인지 확인해주세요.';
@@ -288,6 +307,7 @@ export default function App() {
 
   const handlePaymentSuccess = (paymentInfo: any) => { /* ... */ };
 
+  // (호스트 예약 승인/거절)
   const handleUpdateReservation = async (reservationId: string, status: 'CONFIRMED' | 'REJECTED') => {
     try {
       const updatedReservation = await bookingService.updateBookingStatus(reservationId, { status });
@@ -303,6 +323,7 @@ export default function App() {
     }
   };
 
+  // (게스트 예약 취소)
   const handleCancelReservation = async (reservationId: string) => {
     try {
       const cancelledReservation = await bookingService.cancelBooking(reservationId, '사용자 취소');
@@ -318,14 +339,17 @@ export default function App() {
     }
   };
 
+  // (네비게이션)
   const handleNavigate = (view: string) => {
     setCurrentView(view);
 
+    // "예약 관리" 탭을 눌렀을 때 데이터 로드
     if (view === 'reservations') {
       fetchReservations(0);
     }
   };
 
+  // (홈으로)
   const handleResetToHome = useCallback(() => {
     setCurrentView('home');
     setShowSpaceDetail(false);
@@ -407,7 +431,18 @@ export default function App() {
             {isSearched && !isHost && (
               <div className="mb-6 p-4 rounded-lg bg-gray-100 border" id="search-results-section">
                 <div className="flex items-center justify-between">
-                  {/* ... (생략) */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0 p-3 rounded-full bg-white border shadow-sm">
+                      <Grid className="w-5 h-5 text-gray-700" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">검색 결과</h3>
+                      <p className="text-sm text-muted-foreground">조건에 맞는 <span className="font-semibold text-primary">{pagination.totalElements}개</span>의 공간을 찾았습니다</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={handleClearFilters} className="bg-white">
+                    필터 초기화
+                  </Button>
                 </div>
               </div>
             )}
@@ -427,14 +462,22 @@ export default function App() {
               </div>
 
               <div className="flex flex-col sm:flex-row justify-between items-center mb-4 pb-4 border-b">
-                {/* ... (생략) */}
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="text-sm font-medium">{pagination.totalElements}개 공간</Badge>
+                </div>
+                <div className="flex items-center gap-2 mt-3 sm:mt-0">
+                  <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('grid')}><Grid className="w-4 h-4" /></Button>
+                  <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')}><List className="w-4 h-4" /></Button>
+                </div>
               </div>
 
               {isLoading && spaces.length === 0 ? (
                 <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
               ) : !isLoading && spaces.length === 0 ? (
                 <div className="text-center py-16">
-                   {/* ... (생략) */}
+                   <h4 className="text-xl font-medium mb-2">결과 없음</h4>
+                   <p className="text-muted-foreground">{isHost ? '아직 등록한 공간이 없습니다.' : (isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.')}</p>
+                   {isSearched && (<Button variant="outline" onClick={handleClearFilters} className="mt-4">필터 초기화</Button>)}
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -456,7 +499,9 @@ export default function App() {
                   </div>
                   {pagination.page < pagination.totalPages - 1 && (
                     <div className="text-center pt-8">
-                      {/* ... (생략) */}
+                      <Button variant="outline" size="lg" onClick={handleLoadMore} disabled={isLoading}>
+                        {isLoading ? <LoadingSpinner size="sm" /> : '더보기'}
+                      </Button>
                     </div>
                   )}
                 </div>
