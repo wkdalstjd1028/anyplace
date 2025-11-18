@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -6,9 +6,11 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Separator } from './ui/separator'; // (UI 구분을 위해 추가)
 import { toast } from 'sonner';
 import { Plus, X } from 'lucide-react';
 import { LoadingSpinner } from './LoadingSpinner';
+import apiClient from '../lib/api'; // ★ 1. apiClient 임포트
 
 interface SpaceRegistrationProps {
   isOpen: boolean;
@@ -25,11 +27,7 @@ const spaceTypes = [
   { value: '기타', label: '기타' }
 ];
 
-const sampleImages = [
-  "https://images.unsplash.com/photo-1626187777040-ffb7cb2c5450?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjb3dvcmtpbmclMjBzcGFjZXxlbnwxfHx8fDE3NTc2ODIzNDl8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-  "https://images.unsplash.com/photo-1703355685952-03ed19f70f51?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWV0aW5nJ2Iwcm9vbSUyMG9mZmljZXxlbnwxfHx8fDE3NTc2Mzk2ODR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-  "https://images.unsplash.com/photo-1610206349499-c932c3b3aacb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjcmVhdGl2ZSUyMHdvcmtzcGFjZSUyMHN0dWRpb3xlbnwxfHx8fDE3NTc2MTgwODF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-];
+// (샘플 이미지 삭제)
 
 const initialFormState = {
   name: '',
@@ -38,7 +36,7 @@ const initialFormState = {
   capacity: '',
   pricePerHour: '',
   type: '',
-  mainImageUrl: sampleImages[0],
+  mainImageUrl: '', // ★ 2. 초기값 ''로 변경
   facilities: [] as string[]
 };
 
@@ -47,43 +45,116 @@ export function SpaceRegistration({ isOpen, onClose, onSubmit }: SpaceRegistrati
   const [newFacility, setNewFacility] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ★ 3. 파일 및 미리보기 State 추가
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // ★ 4. (클린업) 모달이 닫히거나 파일이 변경될 때 메모리 누수 방지
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  const handleResetForm = () => {
+    setFormData(initialFormState);
+    setSelectedFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(null);
+  };
+
+  const handleClose = () => {
+    handleResetForm();
+    onClose();
+  }
+
+  // ★ 5. 파일 선택 핸들러
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+
+      // (기존 프리뷰가 있다면 해제)
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+      // 새 프리뷰 생성
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  // ★ 6. (핵심) 2단계 제출 로직
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    // (유효성 검사)
+    // --- 1단계: 유효성 검사 ---
+    if (!selectedFile) {
+      toast.error('대표 이미지를 등록해주세요.');
+      setIsSubmitting(false);
+      return;
+    }
     const capacityNum = parseInt(formData.capacity, 10);
     const priceNum = parseInt(formData.pricePerHour, 10);
 
     if (!formData.name || !formData.description || !formData.address || !formData.type) {
       toast.error('공간명, 유형, 설명, 위치는 필수입니다.');
+      setIsSubmitting(false);
       return;
     }
     if (isNaN(capacityNum) || capacityNum < 1) {
       toast.error('수용 인원은 1명 이상이어야 합니다.');
+      setIsSubmitting(false);
       return;
     }
     if (isNaN(priceNum) || priceNum < 0) {
       toast.error('시간당 가격은 0 이상이어야 합니다.');
+      setIsSubmitting(false);
       return;
     }
 
-    const spaceData = {
-      name: formData.name,
-      description: formData.description,
-      address: formData.address,
-      type: formData.type,
-      capacity: capacityNum,
-      pricePerHour: priceNum,
-      mainImageUrl: formData.mainImageUrl,
-      facilities: formData.facilities,
-      imageUrls: []
-    };
+    let uploadedImageUrl = '';
 
-    setIsSubmitting(true);
+    // --- 2단계: 이미지 파일 업로드 ---
     try {
-      await onSubmit(spaceData);
+      const fileFormData = new FormData();
+      fileFormData.append('file', selectedFile);
+
+      const response = await apiClient.post('/api/files/upload', fileFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      uploadedImageUrl = response.data.data.fileUrl; // (FileUploadController 응답 형식)
+
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      toast.error("이미지 업로드에 실패했습니다.");
+      setIsSubmitting(false);
+      return; // 이미지 업로드 실패 시 중단
+    }
+
+    // --- 3단계: 이미지 URL + 공간 정보 최종 제출 ---
+    try {
+      const spaceData = {
+        name: formData.name,
+        description: formData.description,
+        address: formData.address,
+        type: formData.type,
+        capacity: capacityNum,
+        pricePerHour: priceNum,
+        mainImageUrl: uploadedImageUrl, // ★ 업로드된 URL 사용
+        facilities: formData.facilities,
+        imageUrls: [] // (추후 여러 이미지 업로드 시 사용)
+      };
+
+      await onSubmit(spaceData); // App.tsx의 handleSpaceRegistration 호출
+
       toast.success('공간이 성공적으로 등록되었습니다!');
-      setFormData(initialFormState);
+      handleResetForm(); // 폼 리셋
       onClose();
 
     } catch (error: any) {
@@ -112,7 +183,7 @@ export function SpaceRegistration({ isOpen, onClose, onSubmit }: SpaceRegistrati
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>새 공간 등록</DialogTitle>
@@ -199,29 +270,38 @@ export function SpaceRegistration({ isOpen, onClose, onSubmit }: SpaceRegistrati
                   placeholder="50000"
                   min="0"
                   value={formData.pricePerHour}
-                  // ★★★ (수정) e.g.target.value -> e.target.value
+                  // ★ (오타 수정) e.g.target.value -> e.target.value
                   onChange={(e) => setFormData({ ...formData, pricePerHour: e.target.value })}
                 />
               </div>
             </div>
 
-            {/* (mainImageUrl) */}
+            <Separator />
+
+            {/* ★ 7. (UI 수정) 대표 이미지 업로드 */}
             <div className="space-y-2">
-              <Label>대표 이미지</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {sampleImages.map((img, index) => (
-                  <div
-                    key={index}
-                    className={`cursor-pointer rounded-lg overflow-hidden border-2 ${
-                      formData.mainImageUrl === img ? 'border-primary' : 'border-transparent'
-                    }`}
-                    onClick={() => setFormData({ ...formData, mainImageUrl: img })}
-                  >
-                    <img src={img} alt={`Sample ${index + 1}`} className="w-full h-20 object-cover" />
-                  </div>
-                ))}
-              </div>
+              <Label htmlFor="mainImage">대표 이미지 *</Label>
+              <Input
+                id="mainImage"
+                type="file"
+                accept="image/png, image/jpeg"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500
+                           file:mr-4 file:py-2 file:px-4
+                           file:rounded-full file:border-0
+                           file:text-sm file:font-semibold
+                           file:bg-secondary file:text-secondary-foreground
+                           hover:file:bg-secondary/80"
+              />
+              {imagePreview && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">이미지 미리보기</p>
+                  <img src={imagePreview} alt="대표 이미지 미리보기" className="w-full h-48 object-cover rounded-md border" />
+                </div>
+              )}
             </div>
+
+            <Separator />
 
             {/* (facilities) */}
             <Card>
@@ -264,7 +344,7 @@ export function SpaceRegistration({ isOpen, onClose, onSubmit }: SpaceRegistrati
             </Card>
 
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={handleClose}>
                 취소
               </Button>
               <Button type="submit">

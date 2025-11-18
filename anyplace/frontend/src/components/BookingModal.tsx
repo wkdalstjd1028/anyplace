@@ -30,7 +30,7 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
   const [headCount, setHeadCount] = useState<string>('');
-  const [isSubmitting, setIsSubmitting] = useState(false); // ★ (3. 로딩 상태 추가)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!space) {
     return null;
@@ -46,7 +46,6 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
     return duration > 0 ? duration * space.pricePerHour : 0;
   };
 
-  // ★ (4. handleConfirm을 async로 수정)
   const handleConfirm = async () => {
     if (!selectedDate || !startTime || !endTime || !headCount) {
       toast.error('모든 정보를 입력해주세요');
@@ -61,11 +60,9 @@ export function BookingModal({ space, isOpen, onClose, onConfirm }: BookingModal
       return;
     }
 
-    // ★ (5. 백엔드 DTO 형식에 맞춤)
     const checkInDate = selectedDate.toISOString().split('T')[0];
     const checkOutDate = selectedDate.toISOString().split('T')[0];
 
-    // 백엔드 요청 데이터
     const createRequest = {
       spaceId: String(space?.id), // Long -> String
       checkInDate,
