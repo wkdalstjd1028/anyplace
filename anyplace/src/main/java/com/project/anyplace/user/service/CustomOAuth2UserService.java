@@ -4,16 +4,13 @@ import com.project.anyplace.user.constant.Role;
 import com.project.anyplace.user.entity.User;
 import com.project.anyplace.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -58,11 +55,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         User user = saveOrUpdate(provider, providerId, email, name);
 
-        return new DefaultOAuth2User(
-                Collections.singleton(new SimpleGrantedAuthority(user.getRoleKey())),
-                attributes,
-                userRequest.getClientRegistration().getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()
-        );
+        return UserPrincipal.create(user, oAuth2User);
     }
 
     private User saveOrUpdate(String provider, String providerId, String email, String name) {

@@ -13,6 +13,7 @@ import { toast, Toaster } from 'sonner';
 import spaceService from './service/spaceService';
 import authService from './service/authService';
 import bookingService from './service/bookingService';
+import wishlistService from './service/wishlistService';
 import { Space, SpaceSearchParams, User, Booking } from '../lib/types';
 
 const SpaceRegistration = React.lazy(() => import('./components/SpaceRegistration').then(m => ({ default: m.SpaceRegistration })));
@@ -20,13 +21,13 @@ const SpaceDetail = React.lazy(() => import('./components/SpaceDetail').then(m =
 const BookingModal = React.lazy(() => import('./components/BookingModal').then(m => ({ default: m.BookingModal })));
 const PaymentModal = React.lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
 const ReservationDashboard = React.lazy(() => import('./components/ReservationDashboard').then(m => ({ default: m.ReservationDashboard })));
+const ReservationDetailModal = React.lazy(() => import('./components/ReservationDetailModal').then(m => ({ default: m.ReservationDetailModal })));
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
 
   const isHost = useMemo(() => {
     if (!user) return false;
-    // (수정) ROLE_HOST와 HOST 둘 다 안전하게 체크
     return user.role === 'ROLE_HOST' || user.role === 'HOST' || user.role === 'ROLE_ADMIN';
   }, [user]);
 
@@ -37,7 +38,10 @@ export default function App() {
   const [showSpaceDetail, setShowSpaceDetail] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showReservationDetailModal, setShowReservationDetailModal] = useState(false);
+
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<Booking | null>(null);
   const [bookingData, setBookingData] = useState(null);
 
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -55,11 +59,13 @@ export default function App() {
   const [reservations, setReservations] = useState<Booking[]>([]);
   const [isReservationLoading, setIsReservationLoading] = useState(false);
 
+  const [wishlistSpaces, setWishlistSpaces] = useState<Space[]>([]);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [currentView, setCurrentView] = useState('home');
   const [favoriteSpaces, setFavoriteSpaces] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
-
 
   const handleShowLoginModal = useCallback(() => { setShowAuthModal(true); }, []);
   const handleOidcLogin = useCallback((provider: 'google' | 'kakao' | 'naver') => { authService.redirectToOidcLogin(provider); }, []);
@@ -70,7 +76,7 @@ export default function App() {
       const userData = await authService.getCurrentUser();
       setUser(userData);
     } catch (error) {
-      console.log("Not logged in (this is normal)");
+      console.log("Not logged in");
       setUser(null);
     }
   }, []);
@@ -128,9 +134,8 @@ export default function App() {
     }
   }, [pagination.size]);
 
-  // (예약 조회)
   const fetchReservations = useCallback(async (page = 0) => {
-    if (!user) return; // (추가) user가 확정된 후에만 실행
+    if (!user) return;
 
     setIsReservationLoading(true);
     try {
@@ -153,11 +158,43 @@ export default function App() {
     } finally {
       setIsReservationLoading(false);
     }
-  }, [user, isHost]); // (user, isHost 의존성)
+  }, [user, isHost]);
 
-  // ★ (수정) user/isHost가 확정된 *후에* 홈 화면 데이터를 로드합니다.
+  const fetchWishlistSpaces = useCallback(async () => {
+    if (!user) return;
+    setIsWishlistLoading(true);
+    try {
+      const response = await wishlistService.getMyWishlist(0, 50);
+
+      const mappedSpaces: Space[] = response.content.map((item: any) => ({
+        id: item.spaceId,
+        name: item.spaceName,
+        address: item.spaceAddress,
+        pricePerHour: item.pricePerHour,
+        mainImageUrl: item.mainImageUrl,
+        description: '',
+        capacity: 0,
+        type: 'SPACE',
+        hostId: '',
+        imageUrls: [],
+        facilities: [],
+        rating: 0,
+        reviewCount: 0,
+        isActive: true,
+        createdAt: item.createdAt,
+        updatedAt: item.createdAt
+      }));
+
+      setWishlistSpaces(mappedSpaces);
+    } catch (err) {
+      console.error("Failed to fetch wishlist spaces:", err);
+      toast.error("찜한 공간을 불러오는 데 실패했습니다.");
+    } finally {
+      setIsWishlistLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
-    // checkLoginStatus가 아직 실행 중일 때(user가 undefined)는 실행 방지
     if (typeof user === 'undefined') {
       return;
     }
@@ -172,12 +209,22 @@ export default function App() {
       setCurrentFilters(initialParams);
     }
 
-    const savedFavorites = localStorage.getItem('anyplace_favorites');
+    if (user) {
+      wishlistService.getWishlistSpaceIds()
+        .then(ids => {
+          setFavoriteSpaces(ids);
+          localStorage.setItem('anyplace_favorites', JSON.stringify(ids));
+        })
+        .catch(err => console.error("Failed to load wishlist", err));
+    } else {
+      const savedFavorites = localStorage.getItem('anyplace_favorites');
+      if (savedFavorites) setFavoriteSpaces(JSON.parse(savedFavorites));
+    }
+
     const savedRecentlyViewed = localStorage.getItem('anyplace_recently_viewed');
-    if (savedFavorites) setFavoriteSpaces(JSON.parse(savedFavorites));
     if (savedRecentlyViewed) setRecentlyViewed(JSON.parse(savedRecentlyViewed));
 
-  }, [user, isHost, fetchSpaces, fetchMySpaces, pagination.size]); // (user 의존성 추가)
+  }, [user, isHost, fetchSpaces, fetchMySpaces, pagination.size]);
 
   useEffect(() => { localStorage.setItem('anyplace_favorites', JSON.stringify(favoriteSpaces)); }, [favoriteSpaces]);
   useEffect(() => { localStorage.setItem('anyplace_recently_viewed', JSON.stringify(recentlyViewed)); }, [recentlyViewed]);
@@ -205,13 +252,12 @@ export default function App() {
     }
   }, [checkLoginStatus]);
 
-
   const handleSpaceRegistration = async (spaceData: any) => {
     const newSpace = await spaceService.createSpace(spaceData);
     setSpaces(prev => [newSpace, ...prev]);
   };
 
-  const handleDeleteSpace = async (spaceId: string) => { /* ... */ };
+  const handleDeleteSpace = async (spaceId: string) => { };
 
   const handleClearFilters = useCallback(() => {
     const initialParams: SpaceSearchParams = { page: 0, size: pagination.size, sort: 'createdAt,desc' };
@@ -243,7 +289,6 @@ export default function App() {
     }, 100);
   }, [fetchSpaces, pagination.size]);
 
-
   const handleViewSpace = useCallback(async (spaceId: string) => {
     if (showSpaceDetail) {
       setShowSpaceDetail(false);
@@ -264,40 +309,32 @@ export default function App() {
     }
   }, [isDetailLoading, showSpaceDetail]);
 
-
   const handleBookSpace = (spaceId: string) => {
     setShowSpaceDetail(false);
-    // (spaceId를 이미 selectedSpace.id로 가지고 있으므로,
-    // selectedSpace를 null로 만들지 않고 BookingModal을 띄웁니다.)
     setShowBookingModal(true);
   };
 
-  // (게스트 예약 생성)
+  const handleViewReservation = useCallback((reservation: Booking) => {
+    setSelectedReservation(reservation);
+    setShowReservationDetailModal(true);
+  }, []);
+
   const handleConfirmBooking = async (bookingInfo: any) => {
-    // (bookingInfo는 BookingModal에서 받은 폼 데이터)
     const requestData = {
       spaceId: bookingInfo.spaceId,
       checkInDate: bookingInfo.date.toISOString().split('T')[0],
       checkOutDate: bookingInfo.date.toISOString().split('T')[0],
-      checkInTime: bookingInfo.startTime + ':00', // (초 추가)
-      checkOutTime: bookingInfo.endTime + ':00', // (초 추가)
+      checkInTime: bookingInfo.startTime + ':00',
+      checkOutTime: bookingInfo.endTime + ':00',
       guests: bookingInfo.headCount,
-      specialRequests: '' // (임시)
+      specialRequests: ''
     };
 
     try {
-      // (API 호출)
-      const createdBooking = await bookingService.createBooking(requestData);
-
-      // (성공 시)
+      await bookingService.createBooking(requestData);
       toast.success('예약 요청이 완료되었습니다. 호스트의 승인을 기다리세요.');
       setShowBookingModal(false);
       setSelectedSpace(null);
-
-      // (참고: 원래 이 다음에 결제 모달(PaymentModal)을 띄워야 함)
-      // setBookingData(createdBooking);
-      // setShowPaymentModal(true);
-
     } catch (error: any) {
       console.error('예약 생성 실패:', error);
       const errorMessage = error.response?.data?.message || '예약에 실패했습니다. 이미 예약된 시간인지 확인해주세요.';
@@ -305,9 +342,8 @@ export default function App() {
     }
   };
 
-  const handlePaymentSuccess = (paymentInfo: any) => { /* ... */ };
+  const handlePaymentSuccess = (paymentInfo: any) => { };
 
-  // (호스트 예약 승인/거절)
   const handleUpdateReservation = async (reservationId: string, status: 'CONFIRMED' | 'REJECTED') => {
     try {
       const updatedReservation = await bookingService.updateBookingStatus(reservationId, { status });
@@ -323,7 +359,6 @@ export default function App() {
     }
   };
 
-  // (게스트 예약 취소)
   const handleCancelReservation = async (reservationId: string) => {
     try {
       const cancelledReservation = await bookingService.cancelBooking(reservationId, '사용자 취소');
@@ -332,6 +367,11 @@ export default function App() {
           res.id === reservationId ? cancelledReservation : res
         )
       );
+
+      if (selectedReservation && selectedReservation.id === reservationId) {
+        setSelectedReservation(cancelledReservation);
+      }
+
       toast.success('예약이 취소되었습니다.');
     } catch (error: any) {
       console.error('예약 취소 실패:', error);
@@ -339,23 +379,26 @@ export default function App() {
     }
   };
 
-  // (네비게이션)
   const handleNavigate = (view: string) => {
     setCurrentView(view);
 
-    // "예약 관리" 탭을 눌렀을 때 데이터 로드
     if (view === 'reservations') {
       fetchReservations(0);
+    } else if (view === 'favorites') {
+      fetchWishlistSpaces();
+    } else if (view === 'home') {
+      if (isHost) fetchMySpaces(0);
+      else handleClearFilters();
     }
   };
 
-  // (홈으로)
   const handleResetToHome = useCallback(() => {
     setCurrentView('home');
     setShowSpaceDetail(false);
     setSelectedSpace(null);
     setShowBookingModal(false);
     setShowPaymentModal(false);
+    setShowReservationDetailModal(false);
     if (isHost) {
       fetchMySpaces(0);
     } else {
@@ -364,8 +407,41 @@ export default function App() {
     toast.success('홈으로 돌아왔습니다');
   }, [isHost, handleClearFilters, fetchMySpaces]);
 
-  const handleToggleFavorite = useCallback((spaceId: string) => { /* ... */ }, []);
-  const addToRecentlyViewed = useCallback((spaceId: string) => { /* ... */ }, []);
+  const handleToggleFavorite = useCallback(async (spaceId: string) => {
+    if (!user) {
+      toast.error("로그인이 필요한 서비스입니다.");
+      return;
+    }
+
+    const isAlreadyFavorited = favoriteSpaces.includes(spaceId);
+    setFavoriteSpaces(prev =>
+      isAlreadyFavorited
+        ? prev.filter(id => id !== spaceId)
+        : [...prev, spaceId]
+    );
+
+    try {
+      const response = await wishlistService.toggleWishlist(spaceId);
+      if (response.added) {
+        toast.success("찜 목록에 추가했습니다.");
+      } else {
+        toast.success("찜 목록에서 삭제했습니다.");
+        if (currentView === 'favorites') {
+            setWishlistSpaces(prev => prev.filter(s => s.id !== spaceId));
+        }
+      }
+    } catch (error) {
+      console.error("Wishlist toggle failed", error);
+      toast.error("작업을 처리할 수 없습니다.");
+      setFavoriteSpaces(prev =>
+        isAlreadyFavorited
+          ? [...prev, spaceId]
+          : prev.filter(id => id !== spaceId)
+      );
+    }
+  }, [user, favoriteSpaces, currentView]);
+
+  const addToRecentlyViewed = useCallback((spaceId: string) => { }, []);
 
   const displaySpaces = useMemo(() => spaces, [spaces]);
 
@@ -379,7 +455,6 @@ export default function App() {
       }
     }
   };
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -395,13 +470,13 @@ export default function App() {
       />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Reservations View */}
         {currentView === 'reservations' && (
           <Suspense fallback={<LoadingSpinner size="lg" />}>
             <ReservationDashboard
               reservations={reservations}
               onUpdateReservation={handleUpdateReservation}
               onCancelReservation={handleCancelReservation}
+              onViewReservation={handleViewReservation}
               isHost={isHost}
               isLoading={isReservationLoading}
               user={user}
@@ -409,12 +484,47 @@ export default function App() {
           </Suspense>
         )}
 
-        {/* (Favorites View - 생략) */}
+        {currentView === 'favorites' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">찜한 공간</h2>
+              <p className="text-muted-foreground">
+                총 {wishlistSpaces.length}개의 공간을 찜했습니다
+              </p>
+            </div>
 
-        {/* Home View */}
+            {isWishlistLoading ? (
+              <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
+            ) : wishlistSpaces.length === 0 ? (
+              <div className="text-center py-16 bg-gray-50 rounded-lg border">
+                <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h4 className="text-xl font-medium mb-2">찜한 공간이 없습니다</h4>
+                <p className="text-muted-foreground mb-6">마음에 드는 공간을 찾아 찜해보세요!</p>
+                <Button onClick={() => handleNavigate('home')}>공간 둘러보기</Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {wishlistSpaces.map((space) => (
+                  <SpaceCard
+                    key={space.id}
+                    space={space}
+                    isHost={false}
+                    currentUserId={user?.id}
+                    onDelete={handleDeleteSpace}
+                    onView={handleViewSpace}
+                    showLoginPrompt={!user}
+                    isFavorited={true}
+                    onToggleFavorite={handleToggleFavorite}
+                    isLoadingDetail={isDetailLoading}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {currentView === 'home' && (
           <>
-            {/* (Hero, QuickFilter 등 - 생략) */}
             <div className="text-center pt-16 pb-12">
               <h2 className="text-4xl md:text-5xl font-bold mb-4">어떤 공간이든, anyplace에서</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">회의실, 파티룸, 녹음실부터 연습실까지 - 필요한 모든 공간을 anyplace에서 찾아보세요</p>
@@ -447,14 +557,13 @@ export default function App() {
               </div>
             )}
 
-            {/* (Spaces Section) */}
             <div className="p-6 rounded-xl border bg-card/50" id="spaces-section">
-               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div>
                   <h3 className="text-2xl font-semibold">{isHost ? '내 공간 관리' : (isSearched ? '검색된 공간' : '전체 공간')}</h3>
                   <p className="text-muted-foreground">{isHost ? '등록한 공간을 확인하고 관리하세요' : (isSearched ? '검색 조건에 맞는 공간입니다' : 'anyplace에 등록된 전체 공간입니다')}</p>
                 </div>
-                 {isHost && (
+                {isHost && (
                   <Button onClick={() => setShowSpaceRegistration(true)}>
                     <Plus className="w-4 h-4 mr-2" />새 공간 등록
                   </Button>
@@ -475,9 +584,9 @@ export default function App() {
                 <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
               ) : !isLoading && spaces.length === 0 ? (
                 <div className="text-center py-16">
-                   <h4 className="text-xl font-medium mb-2">결과 없음</h4>
-                   <p className="text-muted-foreground">{isHost ? '아직 등록한 공간이 없습니다.' : (isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.')}</p>
-                   {isSearched && (<Button variant="outline" onClick={handleClearFilters} className="mt-4">필터 초기화</Button>)}
+                  <h4 className="text-xl font-medium mb-2">결과 없음</h4>
+                  <p className="text-muted-foreground">{isHost ? '아직 등록한 공간이 없습니다.' : (isSearched ? '검색 조건에 맞는 공간이 없습니다.' : '아직 등록된 공간이 없습니다.')}</p>
+                  {isSearched && (<Button variant="outline" onClick={handleClearFilters} className="mt-4">필터 초기화</Button>)}
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -511,7 +620,6 @@ export default function App() {
         )}
       </main>
 
-      {/* (모달 및 Suspense 코드) */}
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} onLogin={handleOidcLogin} />
       <HostApplicationModal isOpen={showHostApplicationModal} onClose={() => setShowHostApplicationModal(false)} onSubmit={handleHostApplicationSubmit} isLoading={isHostLoading} />
 
@@ -556,6 +664,15 @@ export default function App() {
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
+        />
+      </Suspense>
+
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"><LoadingSpinner /></div>}>
+        <ReservationDetailModal
+          isOpen={showReservationDetailModal}
+          onClose={() => setShowReservationDetailModal(false)}
+          reservation={selectedReservation}
+          onCancel={handleCancelReservation}
         />
       </Suspense>
 
