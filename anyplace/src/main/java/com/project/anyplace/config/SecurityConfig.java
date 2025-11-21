@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatus; // ⭐️ 임포트 확인
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -55,13 +55,17 @@ public class SecurityConfig {
                         )
                 )
 
+               
                 .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("http://localhost:3000")
-                        .deleteCookies("JSESSIONID")
-                        .invalidateHttpSession(true)
+                        .logoutUrl("/logout") // 1. 로그아웃 엔드포인트 지정
+                        .logoutSuccessHandler((request, response, authentication) -> {
+                            // 2. 리다이렉트 대신 204 상태 코드 반환 (API 방식)
+                            response.setStatus(HttpStatus.NO_CONTENT.value());
+                        })
+                        // .logoutSuccessUrl("http://localhost:3000") // ⬅️ 이 줄은 삭제 또는 주석 처리 (중요)
+                        .deleteCookies("JSESSIONID") // 3. 쿠키 삭제
+                        .invalidateHttpSession(true) // 4. 세션 무효화
                 );
-
         return http.build();
     }
 
@@ -69,12 +73,14 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        // 프론트엔드 주소 허용
         configuration.setAllowedOrigins(List.of("http://localhost:3000"));
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
         configuration.setAllowedHeaders(List.of("*"));
 
+        // 쿠키/인증 정보 허용 (필수)
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

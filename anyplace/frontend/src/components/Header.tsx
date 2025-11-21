@@ -107,7 +107,10 @@ export const Header = React.memo(function Header({ user, onLogin, onLogout, onTo
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>설정</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>로그아웃</span>
                   </DropdownMenuItem>
